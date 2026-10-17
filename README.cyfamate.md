@@ -15,7 +15,7 @@
 - 配布している実行ファイル（Release）の対応するソースは、このブランチの同じ tag。
 
 ## Zyfamate について
-詰み探索は、別の repository で公開している単独の USI 詰将棋エンジン [Zyfamate](https://github.com/yfamate/Zyfamate)（GPLv3）の `source/zyfamate_core.h`（commit a036e97）を、変更せずに `source/zyfamate/zyfamate_core.h` へ写して使っている。Cyfamate 側では `ZYFAMATE_HOST_YANEURAOU` を定義し、証明木を探索側へ渡す経路を有効にしている。Zyfamate を直す時は Zyfamate 側で直してから写す。
+詰み探索は、別の repository で公開している単独の USI 詰将棋エンジン [Zyfamate](https://github.com/yfamate/Zyfamate)（GPLv3）の `source/zyfamate_core.h`（commit d20fafa、yfamate/Zyfamate#1・#2）を、変更せずに `source/zyfamate/zyfamate_core.h` へ写して使っている。Cyfamate 側では `ZYFAMATE_HOST_YANEURAOU` を定義し、証明木を探索側へ渡す経路を有効にしている。Zyfamate を直す時は Zyfamate 側で直してから写す。
 
 ## Pyfamate からの移植
 進行度 GP・Sharpness・Momentum・時間配分は、作者の Python 版エンジン Pyfamate から移植した。Pyfamate の source は `pyfamate/` にあり（この repository は Pyfamate の fork で、Pyfamate の履歴がそのまま親になっている）、各移植部分と移植元の関数の対応は `source/cyfamate/PYFAMATE_PORTS.md`。`pyfamate/` は build に使わず、Pyfamate 自身のライセンス（`pyfamate/LICENSE.txt`）に従う。
