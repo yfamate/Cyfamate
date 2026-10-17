@@ -698,7 +698,7 @@ struct ConthistBonus {
 // ============================================================================
 // ============================================================================
 // Zyfamate ― 自己完結の df-pn 詰将棋エンジン。単独の USI 詰将棋エンジン Zyfamate（https://github.com/yfamate/Zyfamate）
-// の source/zyfamate_core.h（commit a036e97）を source/zyfamate/ に借りている（変更せずに使う。更新は Zyfamate 側で行い写す）。
+// の source/zyfamate_core.h（commit d20fafa）を source/zyfamate/ に借りている（変更せずに使う。更新は Zyfamate 側で行い写す）。
 // ZYFAMATE_HOST_YANEURAOU で、証明木を探索側の局面鍵・指し手形式で渡す経路を有効にする。
 // ============================================================================
 #define ZYFAMATE_HOST_YANEURAOU 1
