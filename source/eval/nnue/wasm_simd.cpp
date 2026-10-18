@@ -6,9 +6,6 @@ namespace emscripten_wasm_simd {
 
 template<int n, int m, int n_stride>
 void affine(const int8_t A[m][n_stride], const uint8_t x[n], const int32_t b[m], int32_t y[m]) {
-  //
-  // Dot product of two SIMD vectors
-  //
   [[maybe_unused]] auto dot_i8x16 = [](__i8x16 a, __i8x16 b) -> __i32x4 {
     __i16x8 a_lo = wasm_i16x8_extend_low_i8x16(a);
     __i16x8 a_hi = wasm_i16x8_extend_high_i8x16(a);
@@ -17,27 +14,19 @@ void affine(const int8_t A[m][n_stride], const uint8_t x[n], const int32_t b[m],
     return wasm_i32x4_add(wasm_i32x4_dot_i16x8(a_lo, b_lo), wasm_i32x4_dot_i16x8(a_hi, b_hi));
   };
 
-  // (NOT USED)
   [[maybe_unused]] auto dot_i16x8 = [](__i16x8 a, __i16x8 b) -> __i32x4 {
     __i16x8 c = wasm_i16x8_mul(a, b);
     return wasm_i32x4_add(wasm_i32x4_extend_low_i16x8(c), wasm_i32x4_extend_high_i16x8(c));
   };
 
-  //
-  // Horizontal sum
-  //
   [[maybe_unused]] auto hadd = [&](__i32x4 x0, __i32x4 x1) -> __i32x4 {
     return wasm_i32x4_add(wasm_i32x4_shuffle(x0, x1, 0, 2, 4, 6), wasm_i32x4_shuffle(x0, x1, 1, 3, 5, 7));
   };
 
-  // (NOT USED)
   [[maybe_unused]] auto haddx4 = [&](__i32x4 x0, __i32x4 x1, __i32x4 x2, __i32x4 x3) -> __i32x4 {
     return hadd(hadd(x0, x1), hadd(x2, x3));
   };
 
-  //
-  // Dot product of two vectors
-  //
   [[maybe_unused]] auto dot = [&](const int8_t* a, const uint8_t* x, const int32_t* b, int32_t* out) {
     __i32x4 z = wasm_i32x4_splat(0);
     for (int j = 0; j < n; j += 16) {
@@ -46,9 +35,6 @@ void affine(const int8_t A[m][n_stride], const uint8_t x[n], const int32_t b[m],
     out[0] = b[0] + z[0] + z[1] + z[2] + z[3];
   };
 
-  //
-  // Four dot products (exploting horizontal sum)
-  //
   [[maybe_unused]] auto dot4 = [&](const int8_t* a, const uint8_t* x, const int32_t* b, int32_t* out) {
     __i32x4 z0 = wasm_i32x4_splat(0);
     __i32x4 z1 = wasm_i32x4_splat(0);
@@ -65,17 +51,12 @@ void affine(const int8_t A[m][n_stride], const uint8_t x[n], const int32_t b[m],
     wasm_v128_store(&out[0], z);
   };
 
-  //
-  // Affine
-  //
 
-  // 2048x8
   if constexpr (n % 16 == 0 && m % 4 == 0) {
     for (int i = 0; i < m; i += 4) {
       dot4(&A[i][0], &x[0], &b[i], &y[i]);
     }
 
-  // 8x32, 32x1 (it doesn't worth optimizing such small kernels)
   } else {
     for (int i = 0; i < m; i++) {
       y[i] = b[i];
@@ -86,10 +67,9 @@ void affine(const int8_t A[m][n_stride], const uint8_t x[n], const int32_t b[m],
   }
 }
 
-// Explicit instantiation
 template void affine< 512, 32,  512>(const int8_t A[32][ 512], const uint8_t x[ 512], const int32_t b[32], int32_t y[32]);
 template void affine<  32, 32,   32>(const int8_t A[32][  32], const uint8_t x[  32], const int32_t b[32], int32_t y[32]);
 template void affine<  32,  1,   32>(const int8_t A[ 1][  32], const uint8_t x[  32], const int32_t b[ 1], int32_t y[ 1]);
 
-} // namespace emscripten_wasm_simd
+} 
 #endif

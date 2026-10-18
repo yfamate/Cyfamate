@@ -1,4 +1,3 @@
-// NNUE評価関数の入力特徴量A2の定義
 
 #include "../../../config.h"
 
@@ -11,13 +10,11 @@ namespace YaneuraOu {
 namespace Eval::NNUE::Features {
 
 namespace {
-  // 後手玉(e_king..fe_end2)を自玉plane(f_king..e_king)に折りたたむv2マッピング
   inline IndexType MapToA2Index(BonaPiece bp) {
     return static_cast<IndexType>(bp >= e_king ? bp - SQ_NB : bp);
   }
 }
 
-// 特徴量のうち、値が1であるインデックスのリストを取得する
 void A2::AppendActiveIndices(
     const Position& pos, Color perspective, IndexList* active) {
   if (RawFeatures::kMaxActiveDimensions < kMaxActiveDimensions) return;
@@ -30,7 +27,6 @@ void A2::AppendActiveIndices(
   }
 }
 
-// 特徴量のうち、一手前から値が変化したインデックスのリストを取得する
 void A2::AppendChangedIndices(
     const Position& pos, Color perspective,
     IndexList* removed, IndexList* added) {
@@ -43,7 +39,7 @@ void A2::AppendChangedIndices(
   }
 }
 
-}  // namespace Eval::NNUE::Features
-}  // namespace YaneuraOu
+}  
+}  
 
-#endif  // defined(EVAL_NNUE)
+#endif  

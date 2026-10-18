@@ -1,8 +1,4 @@
-// Included in Cyfamate's namespace. Threads is the total compute-worker budget.
 struct CpuBudget { int total, alpha, mate, share; };
-// [MT-SHARE 2026-10-14] share=0: Zyfamate threads are reserved out of Threads (alpha=Threads-mate, legacy).
-//   share=1: alpha=Threads; the last `mate` helpers are elastic and park only while a Zyfamate solve is running.
-//   share=2: alpha=Threads; Zyfamate runs as extra threads at below-normal OS priority.
 inline CpuBudget cpu_budget(int total, bool enabled, int requested=0, int share=0){
     total=std::max(1,total);
     const int wanted=requested>0?requested:std::clamp(total/16,1,8);
@@ -11,7 +7,6 @@ inline CpuBudget cpu_budget(int total, bool enabled, int requested=0, int share=
     return {total,share?total:total-mate,mate,share};
 }
 inline CpuBudget& active_cpu_budget(){static CpuBudget b{2,2,0,0};return b;}
-// Zyfamate solves currently consuming a CPU (service lanes, MateWorker, MPON, portfolio children).
 inline std::atomic<int>& zyf_cpu_busy(){static std::atomic<int> n{0};return n;}
 struct ZyfCpuGuard {
     int n;
@@ -19,13 +14,10 @@ struct ZyfCpuGuard {
     ~ZyfCpuGuard(){zyf_cpu_busy().fetch_sub(n,std::memory_order_relaxed);}
     ZyfCpuGuard(const ZyfCpuGuard&)=delete; ZyfCpuGuard& operator=(const ZyfCpuGuard&)=delete;
 };
-// share=2: a Zyfamate compute thread yields to search threads.
 inline void zyf_thread_priority(){
     SetThreadPriority(GetCurrentThread(),active_cpu_budget().share==2?THREAD_PRIORITY_BELOW_NORMAL:THREAD_PRIORITY_NORMAL);
 }
 
-// Each child owns all Zyfamate globals and tables. The coordinator only waits;
-// it does not run an additional solver. No shell and no shared solver state.
 struct ZyfProcess {
     HANDLE process=nullptr, output=nullptr, job=nullptr;
     std::string text;

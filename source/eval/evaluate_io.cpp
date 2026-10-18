@@ -1,16 +1,15 @@
-﻿#include "evaluate_io.h"
+#include "evaluate_io.h"
 #include "../misc.h"
 #include "../usi.h"
 
 #include <fstream>
-#include <cstring>	// memset()
+#include <cstring>	
 
 namespace YaneuraOu {
 namespace EvalIO {
 
 	bool eval_convert(const EvalInfo& input, const EvalInfo& output, const std::vector<u16>* map)
 	{
-		// 特徴因子の型の数が異なるとそもそも変換できない。
 		if (input.eval_info_array.size() != output.eval_info_array.size())
 		{
 			std::cout << "Error! input.eval_info_array.size() != output.eval_info_array.size() in eval_io()" << std::endl;
@@ -23,18 +22,15 @@ namespace EvalIO {
 			auto in_ = input.eval_info_array[i];
 			auto out_ = output.eval_info_array[i];
 
-			// 特徴因子の型名が違うとそもそも変換は定義されていない。
 			if (in_.feature != out_.feature)
 			{
 				std::cout << "Error! input.feature != output.feature in eval_io()" << std::endl;
 				return false;
 			}
 
-			// メモリブロックのサイズの計算
 			auto calc_block_size = [](u64 element_num , u64 element_size , EvalFeature feature , u64 sq_nb , u64 fe_end)
 			{
 				u64 block_size = element_size * element_num;
-				// 型ごとにサイズが異なる
 				switch (feature)
 				{
 				case KK  : block_size *= (sq_nb  ) * (sq_nb  )                      ; break;
@@ -53,9 +49,6 @@ namespace EvalIO {
 			auto input_block_size = calc_block_size(in_.element_num, in_.element_size, in_.feature, input.sq_nb, input.fe_end);
 			auto output_block_size = calc_block_size(out_.element_num, out_.element_size, out_.feature, output.sq_nb, output.fe_end);
 
-			// 型変換の必要があるかどうかの判定
-			// inとoutの型が全く同じでかつ変換mapが指定されていないのであれば、
-			// 単にメモリコピー、ファイル入出力などで済む。このとき、オーバーヘッドは最も小さくて済む。
 			bool convertless = 
 					   in_.element_size == out_.element_size
 					&& in_.element_num == out_.element_num
@@ -63,15 +56,12 @@ namespace EvalIO {
 					&& input.fe_end == output.fe_end
 					&& map == nullptr;
 
-			// 変換が不要のとき。
 			if (convertless)
 			{
-				// memory to memory
 				if (in_.file_or_memory.memory() && out_.file_or_memory.memory())
 				{
 					memcpy(out_.file_or_memory.ptr, in_.file_or_memory.ptr, input_block_size);
 				}
-				// file to memory
 				else if (in_.file_or_memory.file() && out_.file_or_memory.memory())
 				{
 					if (SystemIO::ReadFileToMemory(in_.file_or_memory.filename, [&](size_t size) {
@@ -88,7 +78,6 @@ namespace EvalIO {
 						return false;
 					}
 				}
-				// memory to file
 				else if (in_.file_or_memory.memory() && out_.file_or_memory.file())
 				{
 					if (SystemIO::WriteMemoryToFile(out_.file_or_memory.filename, in_.file_or_memory.ptr, output_block_size).is_not_ok())
@@ -97,7 +86,6 @@ namespace EvalIO {
 						return false;
 					};
 				}
-				// file to file
 				else if (in_.file_or_memory.file() && out_.file_or_memory.file())
 				{
 					std::vector<u8> buffer(input_block_size);
@@ -118,10 +106,7 @@ namespace EvalIO {
 				}
 			}
 			else {
-				// --- 変換が必要なとき。
 				
-				// 1) 出力先がファイルであるなら、まず変換をメモリ上で行なう必要があるので、
-				//   出力のためのバッファをメモリ上に確保する。
 
 				std::vector<u8> output_buffer;
 				void* out_ptr = out_.file_or_memory.ptr;
@@ -131,7 +116,6 @@ namespace EvalIO {
 					out_ptr = (void*)&output_buffer[0];
 				}
 
-				// 2) 入力元がファイルであるなら、まずそのバッファをメモリ上に確保して、メモリに読み込む。
 
 				std::vector<u8> input_buffer;
 				void* in_ptr = in_.file_or_memory.ptr;
@@ -151,14 +135,11 @@ namespace EvalIO {
 						return false;
 				}
 
-				// 3) 変換する
 
 				u64 input_feature_size = in_.element_size * in_.element_num;
 				u64 output_feature_size = out_.element_size * out_.element_num;
 				auto conv = [&](u8* src, u8* dst)
 				{
-					// in_.element_numとout_.element_numの数が異なることがあるのだが…。
-					// とりあえずout_.element_numを基準に考える。
 					for (u64 i = 0; i < out_.element_num; ++i)
 					{
 						s64 n;
@@ -175,8 +156,6 @@ namespace EvalIO {
 							}
 						}
 						else {
-							// out_.element_numのほうがin_.element_numより大きいので
-							// 余る分は0でpaddingしておく。
 							n = 0;
 						}
 
@@ -211,8 +190,6 @@ namespace EvalIO {
 						for (u64 k2 = 0; k2 < output.sq_nb; ++k2)
 							for (u64 p1 = 0; p1< output.fe_end;++p1)
 							{
-								// mapが指定されていれば、input側のmap[p1]を参照する。
-								// ただし、input.fe_endを超えることは出来ないので、その点、注意が必要。
 								u64 input_p1 = map == nullptr ? p1 : map->at(p1);
 								if (input_p1 >= input.fe_end)
 									input_p1 = 0;
@@ -241,9 +218,6 @@ namespace EvalIO {
 						}
 					break;
 
-				//
-				// --- ここから下のコードはテストしていない。間違っていても知らん。
-				//
 
 				case PP:
 					for (u64 p1 = 0; p1 < output.fe_end; ++p1)
@@ -284,8 +258,6 @@ namespace EvalIO {
 					break;
 
 				case KPPP:
-					// こんな正方配列は、メモリきつすぎ。
-					// こんな確保の仕方をしないと思うので、このコードは実際は使わない。
 					for (u64 k1 = 0; k1 < output.sq_nb; ++k1)
 						for (u64 p1 = 0; p1 < output.fe_end; ++p1)
 						{
@@ -315,7 +287,6 @@ namespace EvalIO {
 					break;
 				}
 
-				// 4) 出力先がファイルなら、出力バッファの内容を書き出す
 
 				if (out_.file_or_memory.ptr == nullptr)
 				{
@@ -331,5 +302,5 @@ namespace EvalIO {
 		return true;
 	}
 
-} // namespace EvalIO
-} // namespace YaneuraOu
+} 
+} 

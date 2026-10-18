@@ -2,11 +2,7 @@
 
 #if defined(ENABLE_TEST_CMD)
 
-// ----------------------------------
-//      詰み関係のtestコマンド
-// ----------------------------------
 
-// "test genmate ..."のように"test"コマンドの後続コマンドとして書く。
 
 #include <sstream>
 
@@ -21,12 +17,7 @@ using namespace std;
 namespace YaneuraOu {
 namespace {
 
-	// ----------------------------------
-	//      "test matebench" command
-	// ----------------------------------
 
-	// 詰みルーチンに関するbenchをとる。
-	// このbenchには、"test genmate"コマンドで生成した詰み局面を利用すると良い。
 	void mate_bench(IEngine& engine, std::istringstream& is)
 	{
 		auto& options = engine.get_options();
@@ -38,32 +29,23 @@ namespace {
 		cout << "Error! define USE_MATE_SOLVER or USE_MATE_DFPN" << endl;
 #else
 
-		// 読み込む問題数
 		size_t num = 10000;
 
-		// 問題を何回ずつ解かせるのか。
-		// sfen文字列からPositionにセットする時間がロスするので、何度かずつ同じを局面を繰り返し解かせる時に用いる。
 		size_t loop = 1;
 
-		// 詰み局面のファイル名(genmateコマンドで生成したものを指定すると良い)
 		string filename = "mate.sfen";
 
-		// mate_odd_plyで読む手数
 		int mate_ply = 3;
 
-		// ノード数制限
 		u32 nodes_limit = 10000;
 
-		// dfpn用のメモリ[MB]
 		u32 dfpn_mem = 1024;
 
-		// dfpn-hash table用のメモリ[MB]
 		u32 dfpn_hash = 1024;
 
-		// デバッグ用に、解けなかった問題を出力する。
 		bool verbose = false;
 
-		int test_mode = 3; // mate_odd_plyとdfpnと両方のテストを行う。
+		int test_mode = 3; 
 
 		std::string token;
 		while (is >> token)
@@ -139,7 +121,6 @@ namespace {
 				break;
 			problems->emplace_back(sfen);
 
-			// 読み込み経過を出力
 			if (i % 10000 == 0 && i > 0)
 				cout << ".";
 		}
@@ -159,7 +140,6 @@ namespace {
 			cout << "===== " << test_name << " =====" << endl
 				<< "test start" << endl;
 
-			// 解けた問題数
 			u32 solved = 0;
 			nodes_searched = 0;
 
@@ -167,12 +147,10 @@ namespace {
 
 			TimePoint elapsed = 0;
 
-			// 詰み探索を呼び出した回数。
 			size_t times = 0;
 			
 			auto output_pv = [&]()
 			{
-				// mateを呼び出した回数。
 				cout << " number of times = " << times << " , elapsed = " << elapsed
 					<< " , called per second = " << (double)times * 1000 / (elapsed + 0.00000001)
 					<< " , solved per second = " << (double)solved * 1000 / (elapsed + 0.00000001)
@@ -184,7 +162,6 @@ namespace {
 			for (size_t i = 0; i < size; ++i)
 			{
 				elapsed = timer.elapsed();
-				// pvは一定間隔で出力する。
 				if (last_pv + 2000 < elapsed)
 				{
 					last_pv = elapsed;
@@ -204,9 +181,8 @@ namespace {
 					if (move)
 						solved++;
 					else if (verbose && j == 0)
-						// 解けなかった時にその問題を出力する。
 						cout << "unsolved : line = " << i + 1 << endl <<
-						"sfen " << sfen << endl; // このままの形式でどこかに貼り付けたり、やねうら王に局面設定したりできる。
+						"sfen " << sfen << endl; 
 
 				}
 			}
@@ -220,14 +196,11 @@ namespace {
 		};
 
 #if defined(USE_MATE_SOLVER)
-		// 2進数にしてbit0が立ってたら奇数詰めを呼び出す
 		if (test_mode & 1)
 			bench([&]() { Mate::MateSolver solver; return solver.mate_odd_ply(pos, mate_ply, true); }, "mate_odd_ply");
 #endif
 
 #if defined(USE_MATE_DFPN)
-		// 2進数にしてbit1が立ってたらdfpnを呼び出す
-		// 速度比較用。
 		if (test_mode & 2)
 			bench([&]() { auto m = dfpn1.mate_dfpn(pos, nodes_limit); nodes_searched += dfpn1.get_nodes_searched(); return m; }, "mate_dfpn1 : Node32bit");
 
@@ -251,29 +224,21 @@ namespace {
 
 #endif
 
-		// 他にも詰将棋ルーチンを追加(or 改良)した時に、ここに追加していく。
 
-#endif // !(defined (USE_MATE_SOLVER) || defined(USE_MATE_DFPN))
+#endif 
 	}
 
-	// ----------------------------------
-	//      "test mate_dfpn" command
-	// ----------------------------------
 
-	// 現在の局面に対してdf-pn詰め将棋ルーチンを呼び出す。
 	void mate_dfpn(IEngine& engine, std::istringstream& is)
 	{
 #if !defined(USE_MATE_DFPN)
 		cout << "Error! : define USE_MATE_DFPN" << endl;
 		return;
 #else
-		// 現在の局面
 		auto& pos = engine.get_position();
 
-		// default 1000万ノード(どうせ先にメモリが足りなくなる)
 		size_t nodes = 10000000;
 
-		// df-pn用メモリ
 		size_t mem = 1024;
 		size_t dfpn_hash = 1024;
 
@@ -296,9 +261,7 @@ namespace {
 
 #if 1
 		Mate::Dfpn::MateDfpnSolver dfpn(Mate::Dfpn::DfpnSolverType::Node64bit);
-		//Mate::Dfpn::MateDfpnSolver dfpn(Mate::Dfpn::DfpnSolverType::Node48bitOrdering);
 #else
-		// 置換表を持っているdfpn solver。テスト用。
 		Mate::Dfpn::MateDfpnSolver dfpn(Mate::Dfpn::DfpnSolverType::Node48bitOrderingWithHash);
 		Mate::MateHashTable mate_hash;
 		mate_hash.resize(dfpn_hash);
@@ -338,46 +301,26 @@ namespace {
 #endif
 	}
 
-	// ----------------------------------
-	//      "test matebench2" command
-	// ----------------------------------
 
-	// tanuki-詰将棋ルーチンのbench
-	// そのうち削除するかも。
 
 #if defined (TANUKI_MATE_ENGINE) || defined(YANEURAOU_MATE_ENGINE)
-	// 詰将棋エンジンテスト用局面集
 	static const char* TestMateEngineSfen[] = {
-		// http://www.ne.jp/asahi/tetsu/toybox/shogi/kifu.htm
 		"3sks3/9/4+P4/9/9/+B8/9/9/9 b S2rb4gs4n4l17p 1",
-		// http://www.ne.jp/asahi/tetsu/toybox/shogi/kifu.htm
 		"7nl/7k1/6p2/6S1p/9/9/9/9/9 b GS2r2b3g2s3n3l16p 1",
-		// http://www.ne.jp/asahi/tetsu/toybox/shogi/kifu.htm
 		"4k4/9/PPPPPPPPP/9/9/9/9/9/9 b B4L2rb4g4s4n9p 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2Bukamuse_6700K%2Bcatshogi%2B20170430143005.csa&move_to=102
 		"l2g5/2s3g2/3k1p2p/P2pp2P1/1pP4s1/p1+B6/NP1P+nPS1P/K1G4+p1/L6NL b RBGNLPrs3p 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2Bcoduck_pi2_600MHz_1c%2BShogiNet%2B20170430110007.csa&move_to=100
 		"6lnk/6+Rbl/2n4pp/7s1/1p2P2NP/p1P2PPP1/1P4GS1/6GK1/LNr5L b B2G2S6Pp 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2BSM_1_25_Xeon_E5_2698_v4_40c%2BSILENT_MAJORITY_1.25_6950X%2B20170430103005.csa&move_to=195
 		"lnks5/1pg1s4/2p5p/p4+r3/P1g6/1Nn6/BKN1P3P/9/LG2s4 w GSL2Prbl9p 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2Bcatshogi%2Bgps_l%2B20170430070003.csa&move_to=134
 		"l7l/2+Rbk4/3rp4/2p3pPs/p2P1p2p/2P1G4/P1N1PPN2/2GK2G2/L7L b B2S6Pgs2n 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2Bcatshogi%2BGikouAperyEvalMix_SeoTsume_i5-33%2B20170430063002.csa&move_to=127
 		"l5g1l/2s+B5/p2ppp2p/5kpP1/3n5/6Pp1/P3PP1lP/2+nr2SS1/3N1GKRL w G2Pbgsn3p 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2BGc_at_Cortex-A53_4c%2BSaturday_Crush_4770K%2B20170430023007.csa&move_to=99
 		"l4g2l/7k1/p1+Pp3pp/5ss1P/3Pp1gP1/P3SL3/N2GPK3/1+rP6/+p6RL w BG2N2Pbsn3p 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2BSM_1_25_Xeon_E5_2698_v4_40c%2Bukamuse_i7%2B20170430013007.csa&move_to=116
 		"l2s3nl/3g1p+R+R1/p1k5p/2pPp4/1p1p5/5Sp2/PPP1PP2P/3G5/L1K4NL b BG2S2Pbg2np 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2BGc_at_Cortex-A53_4c%2Bsonic%2B20170430013003.csa&move_to=149
 		"ln7/2gk1S+S2/2+rpPp2G/2p5p/PP4P2/3B4P/K1SP3PN/1Sg2P+np1/L+r6L w L2Pbgn3p 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2BTest_NB10.5_i5_6200U%2BGikouAperyEvalMix_SeoTsume_i5-33%2B20170430010007.csa&move_to=121
 		"6p1l/1+R1G2g2/5pns1/pp1pk3p/2p3P2/P7P/1L1PSP+b2/1SG1K2P1/L5G1L w N2Prbs2n3p 1",
-		// http://wdoor.c.u-tokyo.ac.jp/shogi/view/index.cgi?csa=http://wdoor.c.u-tokyo.ac.jp/shogi/LATEST/2017/04/30/wdoor%2Bfloodgate-300-10F%2BInoue%2Byeu%2B20170430003006.csa&move_to=144
 		"lng3+R2/2kgs4/ppp6/1B1pp4/7B1/2P2pLp1/PP1PP3P/1S1K2p2/LN5GL b RG2SP2n3p 1",
 	};
 #endif
 
-	// MATE ENGINEのテスト。(ENGINEに対して局面図を送信する)
 	void mate_bench2(IEngine& engine, [[maybe_unused]] std::istringstream& is)
 	{
 #if !defined (TANUKI_MATE_ENGINE) && !defined(YANEURAOU_MATE_ENGINE)
@@ -388,27 +331,20 @@ namespace {
 
 		string token;
 
-		// →　デフォルト1024にしておかないと置換表あふれるな。
 		string ttSize = (is >> token) ? token : "1024";
 
-		//options["USI_Hash"] = ttSize;
 		options.set_option_if_exists("USI_Hash", ttSize);
 
-		// 探索制限
 		Search::LimitsType limits;
 		limits.nodes = 0;
-		limits.mate = 100000; // 100秒
+		limits.mate = 100000; 
 
-		// 評価関数の読み込み等
 		engine.isready();
 
-		// トータルの探索したノード数d
 		int64_t nodes = 0;
 
-		// main threadが探索したノード数
 		int64_t nodes_main = 0;
 
-		// ベンチの計測用タイマー
 		ElapsedTimer time;
 
 		for (const char* sfen : TestMateEngineSfen) {
@@ -418,24 +354,20 @@ namespace {
 
 			sync_cout << "\nPosition: " << sfen << sync_endl;
 
-			// 探索時にnpsが表示されるが、それはこのglobalなTimerに基づくので探索ごとにリセットを行なうようにする。
 			time.reset();
 
 			StateListPtr states(new std::deque<StateInfo>(1));
 
             limits.startTime = now();
 			threads.start_thinking(options, pos, st, limits);
-			threads.main_thread()->wait_for_search_finished(); // main thread: ends after its helpers (ThreadPool:: waits for the helpers only and races the main thread for their notify_one) // 探索の終了を待つ。
+			threads.main_thread()->wait_for_search_finished(); 
 
-			// TODO : あとで
-			//   Position::do_move()でノード数をインクリメントしなくなったので
-			//   この方法で取得できない。
 
 			nodes += threads.nodes_searched();
 			nodes_main += threads.nodes_searched();
 		}
 
-		auto elapsed = time.elapsed() + 1; // 0除算の回避のため
+		auto elapsed = time.elapsed() + 1; 
 
 		sync_cout << "\n==========================="
 			<< "\nTotal time (ms) : " << elapsed
@@ -449,33 +381,27 @@ namespace {
 
 		cout << sync_endl;
 
-#endif // !defined (TANUKI_MATE_ENGINE) && !defined(YANEURAOU_MATE_ENGINE)
+#endif 
 	}
 
-} // namespace
+} 
 
 
-// ----------------------------------
-//      "test" command Decorator
-// ----------------------------------
 
 namespace Test
 {
-	// 詰み関係のテストコマンド。コマンドを処理した時 trueが返る。
 	bool mate_test_cmd(IEngine& engine, std::istringstream& is, const std::string& token)
 	{
-		if (token == "matebench")  mate_bench(engine,is);       // 詰みルーチンに関するbenchをとる。
-		else if (token == "matebench2") mate_bench2(engine,is);      // MATE ENGINEのテスト。(ENGINEに対して局面図を送信する)
-		else if (token == "dfpn")       mate_dfpn(engine,is);        // 現在の局面に対してdf-pn詰め将棋ルーチンを呼び出す。
-		//else if (token == "matesolve") mate_solve(engine,is);      // 現在の局面に対してN手詰みルーチンを呼び出す。
-		else return false;									         // どのコマンドも処理することがなかった
+		if (token == "matebench")  mate_bench(engine,is);       
+		else if (token == "matebench2") mate_bench2(engine,is);      
+		else if (token == "dfpn")       mate_dfpn(engine,is);        
+		else return false;									         
 			
-		// いずれかのコマンドを処理した。
 		return true;
 	}
 
-} // namespace Test
+} 
 
-} // namespace YaneuraOu
+} 
 
-#endif // defined(ENABLE_TEST_CMD)
+#endif 

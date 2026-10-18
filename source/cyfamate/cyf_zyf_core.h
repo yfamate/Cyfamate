@@ -1,31 +1,4 @@
 #pragma once
-// Cyf_Zyf_Service core (ZY-01; USI option Cyf_Zyf_Service). No engine types here, so the
-// queue/lifetime rules can be tested with a stub solver (tests/test_zyf_core.cpp).
-//
-// Contract
-//  * One resident worker thread is the only caller of the solver while the service is not paused. It takes the
-//    highest-priority job of the running go, consults the board cache, otherwise runs the solve callback, publishes
-//    final verdicts through the publish callback (the MateTable in the engine) and appends a typed Result to the
-//    go's log. Unknown is never turned into nomate: the outcome keeps why the request ended.
-//  * Producers call submit() from the engine's main thread (go start and completed iterations). A job carries the
-//    go serial (gen); submit() rejects another gen, a key already supplied in this go, and a full queue the job
-//    cannot outrank (an outranked queued job is logged kExpired). submit() never waits for the worker.
-//  * pause_join() interrupts a running request through the stop callback and returns only when the worker is idle;
-//    it stays paused until begin_go(). The engine calls it before it runs Zyfamate itself (tonshi guard, tesuki) or
-//    writes the MateTable after a search, so the solver always has a single owner.
-//  * end_go() logs queued-but-unstarted jobs as kExpired. begin_go(gen) starts a new go log and unpauses; the same
-//    gen again (Stochastic_Ponder replay of one go) keeps the queue and the log.
-//  * Final solver verdicts may be cached; unknown is retained in the log only.
-//  * A non-verdict with SolveOut::tree (proven subtrees, Cyf_Zyf_Tree_Share) is still published, under the same
-//    guard, so PublishFn can store those hints; it must not treat that outcome as a verdict.
-//    Cross-go unknown suppression would need resumable work and a proved retry contract.
-//    History suitability is not certified here. Root jobs always run the solver.
-//  * PublishFn runs under the service mutex and must be bounded/non-reentrant.
-//    It is the sole place for engine publication; SolveFn must only return local state.
-//  * Lanes (Cyf_Zyf_Defense): start(2) runs two workers. Lane 0 takes root/PV/ponder jobs, lane 1 only candidate
-//    jobs (the opponent attacking after one of our root moves). With one lane, that lane takes every kind. Each lane
-//    is the only caller of the solver for its own solver context (LaneInitFn runs first on the lane's thread); the
-//    pause, stop, queue, cache, log and publication rules above hold for both lanes together.
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
@@ -68,24 +41,24 @@ inline int64_t now_us() {
 struct Job {
     uint64_t key = 0, gen = 0, serial = 0;
     std::string sfen;
-    uint8_t kind = kPv, source = kSrcNnuePv, stm = 0;  // stm: side to move = the attacker Zyfamate tries to mate with
-    int8_t ply = 0;                 // plies from the go's root along the job's origin (0 = the root itself)
-    uint16_t root_move = 0;         // raw Move16 of the root move the position descends from (0 = the root)
-    int16_t depth = 0;              // completed iteration depth when supplied
-    int32_t cyfnet = 0;             // parent hint score of root_move (root side's view); valid if has_cyfnet
+    uint8_t kind = kPv, source = kSrcNnuePv, stm = 0;  
+    int8_t ply = 0;                 
+    uint16_t root_move = 0;         
+    int16_t depth = 0;              
+    int32_t cyfnet = 0;             
     bool has_cyfnet = false;
     double priority = 0.0;
-    long nodes = 0;                 // request limits
+    long nodes = 0;                 
     double secs = 0.0;
     int64_t supply_us = 0, deadline_us = 0;
 };
 struct SolveOut {
     uint8_t outcome = kError; int16_t len = 0; long nodes = 0;
-    char root_move_csa[16] = {}; // local result; root publication belongs to PublishFn
-    std::vector<std::pair<uint64_t, uint16_t>> tree; // optional proof-tree (key, move) hints; PublishFn decides
+    char root_move_csa[16] = {}; 
+    std::vector<std::pair<uint64_t, uint16_t>> tree; 
 };
 struct Result {
-    Job job;                        // sfen is dropped when logged
+    Job job;                        
     uint8_t outcome = kNone;
     int16_t len = 0;
     long nodes = 0;
@@ -112,11 +85,9 @@ public:
         std::lock_guard<std::mutex> lk(m_);
         solve_ = std::move(solve); publish_ = std::move(publish); stop_ = std::move(stop); arm_ = std::move(arm); guard_ = std::move(guard);
     }
-    // Called on each lane's thread before its first job (e.g. to select the lane's solver context).
     void set_lane_init(LaneInitFn f) { std::lock_guard<std::mutex> lk(m_); lane_init_ = std::move(f); }
     bool running() const { std::lock_guard<std::mutex> lk(m_); return !th_.empty(); }
     int lanes() const { std::lock_guard<std::mutex> lk(m_); return th_.empty() ? 0 : lanes_; }
-    // Starts paused with `lanes` workers (1 or 2). A running service with another lane count is shut down first.
     void start(int lanes = 1) {
         lanes = lanes == 2 ? 2 : 1;
         {
@@ -140,18 +111,16 @@ public:
         std::lock_guard<std::mutex> lk(m_);
         th_.clear();
     }
-    // Main thread, no search running. A new gen starts a fresh go log; the same gen keeps queue and log.
     void begin_go(uint64_t gen) {
         pause_join();
         std::lock_guard<std::mutex> lk(m_);
         if (gen != gen_) {
-            for (auto& j : q_) log_locked(j, kExpired, 0, 0, 0, 0);   // normally empty: end_go() ran
+            for (auto& j : q_) log_locked(j, kExpired, 0, 0, 0, 0);   
             q_.clear(); log_.clear(); drained_ = 0; go_ = GoCounters{}; go_keys_.clear(); gen_ = gen;
         }
         paused_ = false;
         cv_.notify_all();
     }
-    // Interrupt the running request and wait until the worker is idle. Stays paused until begin_go().
     void pause_join() {
         std::unique_lock<std::mutex> lk(m_);
         paused_ = true;
@@ -177,12 +146,10 @@ public:
         }
         q_.push_back(std::move(j));
         ++go_.accepted;
-        cv_.notify_all();   // lanes wait for different job kinds
+        cv_.notify_all();   
         return true;
     }
-    // Let a key of this go be supplied again (a Stochastic_Ponder replay re-solves its root).
     void forget(uint64_t key) { std::lock_guard<std::mutex> lk(m_); go_keys_.erase(key); }
-    // Results logged since the previous drain (main thread).
     size_t drain(std::vector<Result>& out) {
         std::lock_guard<std::mutex> lk(m_);
         const size_t n = log_.size() - drained_;
@@ -207,7 +174,7 @@ private:
         log_.push_back(std::move(r));
     }
     void cache_put_locked(uint64_t key, uint8_t outcome, int16_t len) {
-        if (outcome != kMate && outcome != kNomate) return; // unknown is not completed work
+        if (outcome != kMate && outcome != kNomate) return; 
         auto it = cache_.find(key);
         if (it == cache_.end()) {
             if (cache_.size() >= kCacheCap) { cache_.erase(cache_order_.front()); cache_order_.pop_front(); }
@@ -218,7 +185,6 @@ private:
     }
     bool publish_current_locked(const Job& j, const SolveOut& o) {
         if (paused_ || quit_ || j.gen != gen_ || (j.deadline_us && now_us() >= j.deadline_us)) return false;
-        // Re-read dynamic engine stop/ponderhit deadline under the publication lock.
         if (guard_ && !guard_(j)) return false;
         if (publish_) publish_(j, o);
         return true;
@@ -251,8 +217,6 @@ private:
                 if (c != cache_.end() && (c->second.verdict == kMate || c->second.verdict == kNomate)) {
                     const SolveOut o{uint8_t(c->second.verdict == kMate ? kCachedMate : kCachedNomate), c->second.len, 0};
                     ++busy_;
-                    // Publication is serialized with pause_join(). Callback must be
-                    // bounded and must not call Service methods.
                     const bool current = publish_current_locked(j, o);
                     --busy_;
                     log_locked(j, current ? o.outcome : uint8_t(kExpired), current ? o.len : 0, 0, t0, now_us());
@@ -261,20 +225,18 @@ private:
                 }
             }
             ++busy_;
-            if (arm_ && busy_ == 1) arm_();   // clears an old interrupt under the lock (the first busy lane only); a later pause_join() sets it again
+            if (arm_ && busy_ == 1) arm_();   
             lk.unlock();
             SolveOut o = solve_ ? solve_(j) : SolveOut{};
             lk.lock();
             bool current = true;
             if (is_verdict(o.outcome)) current = publish_current_locked(j, o);
-            else if (!o.tree.empty()) publish_current_locked(j, o);   // proven-subtree hints only; still logged unknown
+            else if (!o.tree.empty()) publish_current_locked(j, o);   
             const int64_t t1 = now_us();
             --busy_;
             ++go_.solves; ++solves_total_; if (lane == 1) ++go_.lane1_solves;
             go_.solve_us += uint64_t(std::max<int64_t>(0, t1 - t0));
             go_.solve_nodes += uint64_t(std::max(0L, o.nodes));
-            // A solver-local verdict may remain cached; request expiry only removes
-            // its authority to act on this go. History suitability remains separate.
             cache_put_locked(j.key, o.outcome, o.len);
             log_locked(j, current ? o.outcome : uint8_t(kExpired), current ? o.len : 0, o.nodes, t0, t1);
             idle_cv_.notify_all();
@@ -295,8 +257,8 @@ private:
     std::deque<uint64_t> cache_order_;
     GoCounters go_;
     uint64_t gen_ = 0, serial_ = 0, solves_total_ = 0;
-    int busy_ = 0;   // lanes inside a solve or a cached publication
+    int busy_ = 0;   
     bool paused_ = true, quit_ = false;
 };
 
-} // namespace CyfZyf
+} 

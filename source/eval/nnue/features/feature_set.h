@@ -1,5 +1,3 @@
-﻿// A class template that represents the input feature set of the NNUE evaluation function
-// NNUE評価関数の入力特徴量セットを表すクラステンプレート
 
 #ifndef CLASSIC_NNUE_FEATURE_SET_H_INCLUDED
 #define CLASSIC_NNUE_FEATURE_SET_H_INCLUDED
@@ -14,8 +12,6 @@
 namespace YaneuraOu {
 namespace Eval::NNUE::Features {
 
-// Class template that represents a list of values
-// 値のリストを表すクラステンプレート
 template <typename T, T... Values>
 struct CompileTimeList;
 template <typename T, T First, T... Remaining>
@@ -31,13 +27,12 @@ constexpr std::array<T, sizeof...(Remaining) + 1>
     CompileTimeList<T, First, Remaining...>::kValues;
 template <typename T>
 struct CompileTimeList<T> {
-  static constexpr bool Contains(T /*value*/) {
+  static constexpr bool Contains(T ) {
     return false;
   }
   static constexpr std::array<T, 0> kValues = {{}};
 };
 
-// リストの先頭への追加を行うクラステンプレート
 template <typename T, typename ListType, T Value>
 struct AppendToList;
 template <typename T, T... Values, T AnotherValue>
@@ -45,7 +40,6 @@ struct AppendToList<T, CompileTimeList<T, Values...>, AnotherValue> {
   using Result = CompileTimeList<T, AnotherValue, Values...>;
 };
 
-// ソートされた重複のないリストへの追加を行うクラステンプレート
 template <typename T, typename ListType, T Value>
 struct InsertToSet;
 template <typename T, T First, T... Remaining, T AnotherValue>
@@ -64,12 +58,9 @@ struct InsertToSet<T, CompileTimeList<T>, Value> {
   using Result = CompileTimeList<T, Value>;
 };
 
-// Base class of feature set
-// 特徴量セットの基底クラス
 template <typename Derived>
 class FeatureSetBase {
  public:
-  // 特徴量のうち、値が1であるインデックスのリストを取得する
   template <typename IndexListType>
   static void AppendActiveIndices(
       const Position& pos, TriggerEvent trigger, IndexListType active[2]) {
@@ -79,7 +70,6 @@ class FeatureSetBase {
     }
   }
 
-  // 特徴量のうち、一手前から値が変化したインデックスのリストを取得する
   template <typename PositionType, typename IndexListType>
   static void AppendChangedIndices(
       const PositionType& pos, TriggerEvent trigger,
@@ -122,9 +112,6 @@ class FeatureSetBase {
   }
 };
 
-// Class template that represents the feature set
-// 特徴量セットを表すクラステンプレート
-// 実行時の計算量を線形にするために、内部の処理はテンプレート引数の逆順に行う
 template <typename FirstFeatureType, typename... RemainingFeatureTypes>
 class FeatureSet<FirstFeatureType, RemainingFeatureTypes...> :
     public FeatureSetBase<
@@ -134,27 +121,21 @@ class FeatureSet<FirstFeatureType, RemainingFeatureTypes...> :
   using Tail = FeatureSet<RemainingFeatureTypes...>;
 
  public:
-  // 評価関数ファイルに埋め込むハッシュ値
   static constexpr std::uint32_t kHashValue =
       Head::kHashValue ^ (Tail::kHashValue << 1) ^ (Tail::kHashValue >> 31);
-  // 特徴量の次元数
   static constexpr IndexType kDimensions =
       Head::kDimensions + Tail::kDimensions;
-  // 特徴量のうち、同時に値が1となるインデックスの数の最大値
   static constexpr IndexType kMaxActiveDimensions =
       Head::kMaxActiveDimensions + Tail::kMaxActiveDimensions;
-  // 差分計算の代わりに全計算を行うタイミングのリスト
   using SortedTriggerSet = typename InsertToSet<TriggerEvent,
       typename Tail::SortedTriggerSet, Head::kRefreshTrigger>::Result;
   static constexpr auto kRefreshTriggers = SortedTriggerSet::kValues;
 
-  // 特徴量名を取得する
   static std::string GetName() {
     return std::string(Head::kName) + "+" + Tail::GetName();
   }
 
  private:
-  // 特徴量のうち、値が1であるインデックスのリストを取得する
   template <typename IndexListType>
   static void CollectActiveIndices(
       const Position& pos, const TriggerEvent trigger, const Color perspective,
@@ -169,7 +150,6 @@ class FeatureSet<FirstFeatureType, RemainingFeatureTypes...> :
     }
   }
 
-  // 特徴量のうち、一手前から値が変化したインデックスのリストを取得する
   template <typename IndexListType>
   static void CollectChangedIndices(
       const Position& pos, const TriggerEvent trigger, const Color perspective,
@@ -188,42 +168,29 @@ class FeatureSet<FirstFeatureType, RemainingFeatureTypes...> :
     }
   }
 
-  // 基底クラスと、自身を再帰的に利用するクラステンプレートをfriendにする
   friend class FeatureSetBase<FeatureSet>;
   template <typename... FeatureTypes>
   friend class FeatureSet;
 };
 
-// 特徴量セットを表すクラステンプレート
-// テンプレート引数が1つの場合の特殊化
 template <typename FeatureType>
 class FeatureSet<FeatureType> : public FeatureSetBase<FeatureSet<FeatureType>> {
  public:
-  // Hash value embedded in the evaluation file
-  // 評価関数ファイルに埋め込むハッシュ値
   static constexpr std::uint32_t kHashValue = FeatureType::kHashValue;
-  // Number of feature dimensions
-  // 特徴量の次元数
   static constexpr IndexType kDimensions = FeatureType::kDimensions;
 
-  // Maximum number of simultaneously active features
-  // 特徴量のうち、同時に値が1となるインデックスの数の最大値
   static constexpr IndexType kMaxActiveDimensions =
       FeatureType::kMaxActiveDimensions;
 
-  // Trigger for full calculation instead of difference calculation
-  // 差分計算の代わりに全計算を行うタイミングのリスト
   using SortedTriggerSet =
       CompileTimeList<TriggerEvent, FeatureType::kRefreshTrigger>;
   static constexpr auto kRefreshTriggers = SortedTriggerSet::kValues;
 
-  // 特徴量名を取得する
   static std::string GetName() {
     return FeatureType::kName;
   }
 
  private:
-  // 特徴量のうち、値が1であるインデックスのリストを取得する
   static void CollectActiveIndices(
       const Position& pos, const TriggerEvent trigger, const Color perspective,
       IndexList* const active) {
@@ -232,7 +199,6 @@ class FeatureSet<FeatureType> : public FeatureSetBase<FeatureSet<FeatureType>> {
     }
   }
 
-  // 特徴量のうち、一手前から値が変化したインデックスのリストを取得する
   static void CollectChangedIndices(
       const Position& pos, const TriggerEvent trigger, const Color perspective,
       IndexList* const removed, IndexList* const added) {
@@ -241,15 +207,14 @@ class FeatureSet<FeatureType> : public FeatureSetBase<FeatureSet<FeatureType>> {
     }
   }
 
-  // 基底クラスと、自身を再帰的に利用するクラステンプレートをfriendにする
   friend class FeatureSetBase<FeatureSet>;
   template <typename... FeatureTypes>
   friend class FeatureSet;
 };
 
-} // namespace Eval::NNUE::Features
-} // namespace YaneuraOu
+} 
+} 
 
-#endif  // defined(EVAL_NNUE)
+#endif  
 
-#endif // #ifndef NNUE_FEATURE_SET_H_INCLUDED
+#endif 

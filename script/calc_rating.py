@@ -1,7 +1,6 @@
 import sys
 import math
 
-# python calc_rating.py 60 40
 
 param = sys.argv
 win = float(param[1])

@@ -1,4 +1,3 @@
-﻿// SFNN without PSQT 1536 architecture
 
 #ifndef CLASSIC_NNUE_SFNN_1536_H_INCLUDED
 #define CLASSIC_NNUE_SFNN_1536_H_INCLUDED
@@ -11,19 +10,13 @@
 namespace YaneuraOu {
 namespace Eval::NNUE {
 
-// Input features used in evaluation function
-// 評価関数で用いる入力特徴量
 using RawFeatures = Features::FeatureSet<
     Features::HalfKA_hm2<Features::Side::kFriend>>;
 
-// Number of input feature dimensions after conversion
-// 変換後の入力特徴量の次元数
 constexpr IndexType kTransformedFeatureDimensions = 1536;
 
-// Number of networks stored in the evaluation file
 constexpr int LayerStacks = 9;
 
-// 各層の次元数
 constexpr IndexType kInputDims   = kTransformedFeatureDimensions;
 constexpr IndexType kHidden1Dims = 15;
 constexpr IndexType kHidden2Dims = 32;
@@ -37,7 +30,7 @@ struct Network : NetworkBase {
 	}
 };
 
-}  // namespace Eval::NNUE
-}  // namespace YaneuraOu
+}  
+}  
 
-#endif // CLASSIC_NNUE_SFNN_1536_H_INCLUDED
+#endif 

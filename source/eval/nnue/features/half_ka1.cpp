@@ -1,4 +1,3 @@
-﻿// NNUE評価関数の入力特徴量HalfKAの定義
 
 #include "../../../config.h"
 
@@ -10,14 +9,11 @@
 namespace YaneuraOu {
 namespace Eval::NNUE::Features {
 
-	// 玉の位置とBonaPieceから特徴量のインデックスを求める
 	template <Side AssociatedKing>
 	inline IndexType HalfKA1<AssociatedKing>::MakeIndex(Square sq_k, BonaPiece p) {
-		// 両玉を区別して含める
 		return static_cast<IndexType>(fe_end2) * static_cast<IndexType>(sq_k) + static_cast<IndexType>(p);
 	}
 
-	// 駒の情報を取得する
 	template <Side AssociatedKing>
 	inline void HalfKA1<AssociatedKing>::GetPieces(
 		const Position& pos, Color perspective,
@@ -31,11 +27,9 @@ namespace Eval::NNUE::Features {
 		*sq_target_k = static_cast<Square>(((*pieces)[target] - f_king) % SQ_NB);
 	}
 
-	// 特徴量のうち、値が1であるインデックスのリストを取得する
 	template <Side AssociatedKing>
 	void HalfKA1<AssociatedKing>::AppendActiveIndices(
 		const Position& pos, Color perspective, IndexList* active) {
-		// コンパイラの警告を回避するため、配列サイズが小さい場合は何もしない
 		if (RawFeatures::kMaxActiveDimensions < kMaxActiveDimensions) return;
 
 		BonaPiece* pieces;
@@ -46,7 +40,6 @@ namespace Eval::NNUE::Features {
 		}
 	}
 
-	// 特徴量のうち、一手前から値が変化したインデックスのリストを取得する
 	template <Side AssociatedKing>
 	void HalfKA1<AssociatedKing>::AppendChangedIndices(
 		const Position& pos, Color perspective,
@@ -68,7 +61,7 @@ namespace Eval::NNUE::Features {
 	template class HalfKA1<Side::kFriend>;
 	template class HalfKA1<Side::kEnemy>;
 
-}  // namespace Eval::NNUE::Features
-}  // namespace YaneuraOu
+}  
+}  
 
-#endif  // defined(EVAL_NNUE)
+#endif  

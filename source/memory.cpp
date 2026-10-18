@@ -1,4 +1,4 @@
-﻿#include <cstdlib>
+#include <cstdlib>
 
 #include "memory.h"
 #include "misc.h"
@@ -21,30 +21,23 @@
 #ifdef _WIN32
     #if _WIN32_WINNT < 0x0601
         #undef _WIN32_WINNT
-        #define _WIN32_WINNT 0x0601  // Force to include needed API prototypes
+        #define _WIN32_WINNT 0x0601  
     #endif
 
     #ifndef NOMINMAX
         #define NOMINMAX
     #endif
 
-    #include <ios>       // std::hex, std::dec
-    #include <iostream>  // std::cerr
-    #include <ostream>   // std::endl
+    #include <ios>       
+    #include <iostream>  
+    #include <ostream>   
     #include <windows.h>
 
-// The needed Windows API for processor groups could be missed from old Windows
-// versions, so instead of calling them directly (forcing the linker to resolve
-// the calls at compile time), try to load them at runtime. To do this we need
-// first to define the corresponding function pointers.
 
 #endif
 
 namespace YaneuraOu {
 
-// Wrappers for systems where the c++17 implementation does not guarantee the
-// availability of aligned_alloc(). Memory allocated with std_aligned_alloc()
-// must be freed with std_aligned_free().
 
 void* std_aligned_alloc(size_t alignment, size_t size) {
 #if defined(_ISOC11_SOURCE)
@@ -75,8 +68,6 @@ void std_aligned_free(void* ptr) {
 #endif
 }
 
-// aligned_large_pages_alloc() will return suitably aligned memory,
-// if possible using large pages.
 
 #if defined(_WIN32)
 
@@ -84,7 +75,6 @@ static void* aligned_large_pages_alloc_windows([[maybe_unused]] size_t allocSize
 
     return windows_try_with_large_page_priviliges(
       [&](size_t largePageSize) {
-          // Round up size to full pages and allocate
           allocSize = (allocSize + largePageSize - 1) & ~size_t(largePageSize - 1);
           return VirtualAlloc(nullptr, allocSize, MEM_RESERVE | MEM_COMMIT | MEM_LARGE_PAGES,
                               PAGE_READWRITE);
@@ -93,36 +83,24 @@ static void* aligned_large_pages_alloc_windows([[maybe_unused]] size_t allocSize
 }
 
 #if !STOCKFISH
-// 🌈 やねうら王独自
-// 初回のlarge pageのallocationに対してメッセージを出力するためのフラグ。
 bool first_large_pages_allocation = true;
 #endif
 
 void* aligned_large_pages_alloc(size_t allocSize) {
 
-	// ※　ここでは4KB単位でalignされたメモリが返ることは保証されているので
-	//     引数でalignを指定できる必要はない。(それを超えた大きなalignを行いたいケースがない)
 
-    // Try to allocate large pages
     void* mem = aligned_large_pages_alloc_windows(allocSize);
 
-    // Fall back to regular, page-aligned, allocation if necessary
-	// 必要に応じて、通常のpage-alignedなメモリ割り当てにfall backする。
 
-	// ⇨ LargePage非対応の環境であれば、std::aligned_alloc()を用いて確保しておく。
-	//   最低でも4KBでalignされたメモリが返るので、引数でalign sizeを指定できるようにする必要はない。
     if (!mem)
         mem = VirtualAlloc(nullptr, allocSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 #if !STOCKFISH
 	else
 	{
-		// 🌈 やねうら王独自
-		// large pageのallocationに成功したのでメッセージを出力。
 		
 		if (first_large_pages_allocation)
 		{
-			// Large Pagesを確保した旨を出力。
 			sync_cout << "info string Large Pages are used." << sync_endl;
 			first_large_pages_allocation = false;
 		}
@@ -137,12 +115,11 @@ void* aligned_large_pages_alloc(size_t allocSize) {
 void* aligned_large_pages_alloc(size_t allocSize) {
 
     #if defined(__linux__)
-    constexpr size_t alignment = 2 * 1024 * 1024;  // 2MB page size assumed
+    constexpr size_t alignment = 2 * 1024 * 1024;  
     #else
-    constexpr size_t alignment = 4096;  // small page size assumed
+    constexpr size_t alignment = 4096;  
     #endif
 
-    // Round up to multiples of alignment
     size_t size = ((allocSize + alignment - 1) / alignment) * alignment;
     void*  mem  = std_aligned_alloc(alignment, size);
     #if defined(MADV_HUGEPAGE)
@@ -157,7 +134,7 @@ bool has_large_pages() {
 
 #if defined(_WIN32)
 
-    constexpr size_t page_size = 2 * 1024 * 1024;  // 2MB page size assumed
+    constexpr size_t page_size = 2 * 1024 * 1024;  
     void*            mem       = aligned_large_pages_alloc_windows(page_size);
     if (mem == nullptr)
     {
@@ -185,8 +162,6 @@ bool has_large_pages() {
 }
 
 
-// aligned_large_pages_free() will free the previously memory allocated
-// by aligned_large_pages_alloc(). The effect is a nop if mem == nullptr.
 
 #if defined(_WIN32)
 
@@ -207,4 +182,4 @@ void aligned_large_pages_free(void* mem) { std_aligned_free(mem); }
 
 #endif
 
-} // namespace YaneuraOu
+} 

@@ -1,6 +1,3 @@
-//#include <iostream>
-//#include "bitboard.h"
-//#include "position.h"
 #include "search.h"
 #include "thread.h"
 #include "tt.h"
@@ -12,7 +9,6 @@ using namespace YaneuraOu;
 
 namespace
 {
-	// ファイルの中身を出力する。
 	void print_file(const std::string& path)
 	{
 		SystemIO::TextReader reader;
@@ -25,34 +21,24 @@ namespace
 	}
 }
 
-// ----------------------------------------
-//  main()
-// ----------------------------------------
 
-// main関数は、namespaceに入れてはならない。(それをするとWindowsアプリ扱いされてしまう)
+#include "cyf_csa.h"   
 static int cyf_zyf_child_entry(int argc, char* argv[]);
 int main(int argc, char* argv[])
 {
     if(argc>1 && std::string(argv[1])=="--cyf-zyf-worker")return cyf_zyf_child_entry(argc,argv);
-	// CommandLineにはglobal objectがあるので、これに設定しておく。
-	CommandLine::g.set_arg(argc, argv);
+	const bool cyf_csa_mode = CyfCsa::start_if_requested(argc, argv);
+	CommandLine::g.set_arg(cyf_csa_mode ? 1 : argc, argv);
 
 	#if 0
-	// 起動直後にソフト名と作者の出力。
-    //std::cout << engine_info() << std::endl;
 	#endif
-	// 📌 やねうら王ではMultiEngineを採用しており、
-	//     このタイミングではエンジン名が確定しないから出力できない。
 
-	// 起動時に説明書きを出力。(やねうら王独自拡張)
 	print_file("startup_info.txt");
 
-	// -- 全体的な初期化
 
 	Bitboards::init();
 	Position::init();
 
-	// 自作Engineのentry point(これはEngineFuncRegisterを用いて登録されている。)
 	YaneuraOu::run_engine_entry();
 
 	return 0;

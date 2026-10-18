@@ -1,7 +1,3 @@
-# NNUE architecture header generator
-#
-#  NNUE評価関数のarchitecture headerを動的に生成するPythonで書かれたスクリプト。
-# 
 
 import argparse
 import os
@@ -9,8 +5,6 @@ import subprocess
 import sys
 
 def dedent4(text: str) -> str:
-    # 各行の先頭4文字（スペース4つ）を削除して結合し直す
-    # 行が4文字未満、あるいはスペースでない場合を考慮して lstrip でも可
     return "\n".join(line[4:] if line.startswith("    ") else line 
                         for line in text.strip("\n").splitlines())
 
@@ -53,7 +47,6 @@ FEATURE_INFO = {
     "halfkahm2": ("HalfKA_hm2(Friend)", 0x7F234CB8, 5 * FILE_NB * E_KING),
 }
 
-# makefileで指定したエディション名そのままかも知れないので削除。
 arch = strip_prefix_ci(arch, "YANEURAOU_ENGINE_")
 arch = strip_prefix_ci(arch, "NNUE_")
 
@@ -66,43 +59,23 @@ if "LS9" in arch_upper_for_validation.split('_'):
     print("Error! : ls9 is no longer supported. Use no suffix, hand4/16/64/64z/256/1024, k3k3, k9k9, k9k9z, k13k13z, k21k21, k29k29, or their long names.")
     raise SystemExit(1)
 
-# 出力ファイル名
 filename = arch + ".h"
 
-# 出力file path
 out_path = os.path.join(out_dir, filename)
 
 print(f"output file path  : {out_path}")
 
-# 大文字化して、'-'を'_'に置換したアーキテクチャ名
 arch   = arch.replace('-','_')
 arch   = arch.upper()
 
 print(f"architecture name : {arch}")
 
-# if os.path.exists(out_path):
-#     print("Warning : file already exists. stop.")
-#     exit()
-#  🤔 ファイルがすでに存在していても上書きしたほうがいいと思う。
 
 arches = arch.split('_')
 if len(arches) <= 3 :
-    # アーキテクチャ名は、アンダースコアは3つ以上ないと駄目。
     print("Error! : architecture name must be like halfkp_256x2-32-32 or kp_256x2-32-32 halfkpvm_256x2_32_32")
     raise SystemExit(1)
 
-# 📝 SFNN_halfkahm2_1536-15-32-k3k3のように指定されていれば、SFNNのheaderを生成する。
-#     SFNN_ka2_3072_7_64_c1024_s256x8_k3k3 のように、cN_sMxG を置くと
-#     fc_0を common N + shard M x G に分割する。
-#     SFNN_halfka2_1024_7_64 のようにsuffixを省略すると、単一LayerStackになる。
-#     SFNN_halfka2_1024_7_64_hand64z のように、hand64zを指定すると
-#     手番側/非手番側の手駒点を8段階ずつに分けた64 bucketを用いる。
-#     hand4 / hand16 / hand64 / hand256 / hand1024も同様に、手番側/非手番側の手駒状態でbucketを用いる。
-#     SFNN_halfka2_1024_7_64_k9k9 / k9k9z / k13k13z / k21k21 / k29k29 のように指定すると、
-#     手番側/非手番側の玉位置でbucketを分ける。
-#     SFNN_halfka2_1024_7_64_hand16_k3k3 / hand64z_k9k9 / hand64z_k13k13z / hand64z_k21k21 / hand64z_k29k29 のように、
-#     hand bucketと複合できる。
-#     SFNN_halfka2_1024_7_64_k3k3_progress8 のようにprogress2/3/4/8/16/32とも複合できる。
 SFNN = False
 layer_stack_name = ""
 layer_stack_count = ""
@@ -241,9 +214,6 @@ if arches[0].startswith("SFNN"):
 
     arches = [arches[1], arches[2], arches[3], arches[4], layer_stack_count]
 
-# ============================================================
-#                        includes
-# ============================================================
 
 if SFNN:
     header = f"""
@@ -260,21 +230,7 @@ else:
     #define NNUE_{arch}_H_INCLUDED
     """
 
-# ============================================================
-#                     input features
-# ============================================================
 
-# アーキテクチャ名のアンダースコアでsplitした1つ目は入力特徴量。
-# 現在サポートしている入力特徴量は、
-#   halfkp
-#   kp
-#   ka2
-#   halfkpe9
-#   halfkpvm
-#   halfka1
-#   halfkahm1
-#   halfka2
-#   halfkahm2
 
 input_feature = arches[0].lower()
 
@@ -386,7 +342,6 @@ elif input_feature == "halfkahm2":
     """
 
 else:
-    # 知らない入力特徴量だった。
     print(f"Error : input feature {input_feature} is not supported.")
     raise SystemExit(1)
 
@@ -418,13 +373,7 @@ else:
 
 header += raw_features
 
-# ============================================================
-#                     hidden layers
-# ============================================================
 
-# レイヤ情報
-# 例えば、"256x2_32_32" ならば ["256x2","32","32"]のように分解される。
-#   (SFNNで) "1536-15-32-k3k3" なら ["1536","15","32","9"]のように分解される。(はず)
 layers = arches[1:]
 layers[0] = layers[0].lower()
 
@@ -526,9 +475,6 @@ else:
         }}  // namespace Layers
     """
 
-# ============================================================
-#                     output layer
-# ============================================================
 
 if SFNN:
     fc_0_type = "Layers::AffineTransformSparseInputExplicit<kInputDims, kHidden1OutputDims>"
@@ -577,7 +523,6 @@ if SFNN:
     #endif // CLASSIC_NNUE_{arch}_H_INCLUDED
     """
 
-    # 💡 GetStructureString()で異なる文字列を返すと別のアーキテクチャとみなされてしまう。
 
 else:
     header += f"""

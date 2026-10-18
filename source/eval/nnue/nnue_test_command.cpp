@@ -1,4 +1,3 @@
-﻿// NNUE評価関数に関するUSI拡張コマンド
 
 #include "../../config.h"
 
@@ -15,15 +14,14 @@ namespace Eval::NNUE {
 
 namespace {
 
-// 主に差分計算に関するRawFeaturesのテスト
 void TestFeatures(Position& pos) {
   const std::uint64_t num_games = 1000;
   StateInfo si;
   pos.set_hirate(&si);
-  const int MAX_PLY = 256; // 256手までテスト
+  const int MAX_PLY = 256; 
 
-  StateInfo state[MAX_PLY]; // StateInfoを最大手数分だけ
-  int ply; // 初期局面からの手数
+  StateInfo state[MAX_PLY]; 
+  int ply; 
 
   PRNG prng(20171128);
 
@@ -92,13 +90,11 @@ void TestFeatures(Position& pos) {
   for (std::uint64_t i = 0; i < num_games; ++i) {
     auto index_sets = make_index_sets(pos);
     for (ply = 0; ply < MAX_PLY; ++ply) {
-      MoveList<LEGAL_ALL> mg(pos); // 全合法手の生成
+      MoveList<LEGAL_ALL> mg(pos); 
 
-      // 合法な指し手がなかった == 詰み
       if (mg.size() == 0)
         break;
 
-      // 生成された指し手のなかからランダムに選び、その指し手で局面を進める。
       Move m = mg.begin()[prng.rand(mg.size())];
       pos.do_move(m, state[ply]);
 
@@ -109,7 +105,6 @@ void TestFeatures(Position& pos) {
 
     pos.set_hirate(&si);
 
-    // 100回に1回ごとに'.'を出力(進んでいることがわかるように)
     if ((i % 100) == 0)
       std::cout << "." << std::flush;
   }
@@ -137,7 +132,6 @@ void TestFeatures(Position& pos) {
             << ") features" << std::endl;
 }
 
-// 評価関数の構造を表す文字列を出力する
 void PrintInfo(std::istream& stream) {
   std::cout << "network architecture: " << GetArchitectureString() << std::endl;
 
@@ -171,9 +165,8 @@ void PrintInfo(std::istream& stream) {
   }
 }
 
-}  // namespace
+}  
 
-// NNUE評価関数に関するUSI拡張コマンド
 void TestCommand(Position& pos, std::istream& stream) {
   std::string sub_command;
   stream >> sub_command;
@@ -189,7 +182,7 @@ void TestCommand(Position& pos, std::istream& stream) {
   }
 }
 
-} // namespace Eval::NNUE
-} // namespace YaneuraOu
+} 
+} 
 
-#endif  // defined(ENABLE_TEST_CMD) && defined(EVAL_NNUE)
+#endif  

@@ -1,4 +1,4 @@
-﻿#ifndef _EVAL_SUM_H_
+#ifndef _EVAL_SUM_H_
 #define _EVAL_SUM_H_
 
 #include "../types.h"
@@ -7,10 +7,7 @@
 namespace YaneuraOu {
 namespace Eval {
 
-	// KPPT,KPP_PPTで使うためのヘルパクラス
-	// 手番つきの評価値の合計を計算するために用いる。
 
-	// std::array<T,2>に対して 基本的な演算を提供する。
 	template <typename Tl, typename Tr>
 	FORCE_INLINE std::array<Tl, 2> operator += (std::array<Tl, 2> & lhs, const std::array<Tr, 2> & rhs) {
 		lhs[0] += (Tl)rhs[0];
@@ -65,14 +62,12 @@ namespace Eval {
 		return a;
 	}
 
-	// 与えられたarrayが0ベクトルであるかどうかを判定する。
 	template <typename T>
 	bool is_zero(const std::array<T, 2> v)
 	{
 		return v[0] == T(0) && v[1] == T(0);
 	}
 
-	// デバッグ用出力
 	template <typename T>
 	std::ostream& operator<<(std::ostream& os, const std::array<T, 2> v)
 	{
@@ -80,20 +75,8 @@ namespace Eval {
 		return os;
 	}
 
-	//
-	// 手番つきの評価値を足していくときに使うclass
-	//
 
-	// EvalSum sum;
-	// に対して
-	// sum.p[0] = ΣBKKP
-	// sum.p[1] = ΣWKPP
-	// sum.p[2] = ΣKK (or ΣPPなど)
-	// (それぞれに手番は加味されているものとする)
-	// sum.sum() == ΣBKPP - ΣWKPP + ΣKK (or ΣPPなど)
 
-	// EvalSumクラスは、コンストラクタでの初期化が保証できないので(オーバーヘッドがあるのでやりたくないので)
-	// GCC 7.1.0以降で警告が出るのを回避できない。ゆえに、このクラスではこの警告を抑制する。
 #if defined (__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif
@@ -122,29 +105,20 @@ namespace Eval {
 
 		EvalSum() {}
 
-		// この局面の手番は c側にあるものとする。c側から見た評価値を返す。
 		int32_t sum(const Color c) const
 		{
-			// NDF(2014)の手番評価の手法。
-			// cf. http://www.computer-shogi.org/wcsc24/appeal/NineDayFever/NDF.txt
 
 #if defined(EVAL_KPP_KKPT)
 			
-			// p[0][1]とp[1][1]は使っていないタイプのEvalSum
 			const int32_t scoreBoard = p[0][0] - p[1][0] + p[2][0];
-			// 手番に依存する評価値合計
 			const int32_t scoreTurn = p[2][1];
 
-#else // EVAL_KPPT , EVAL_KKPPT などはこちら。
+#else 
 
-			// 手番に依存しない評価値合計
-			// p[1][0]はΣWKPPなので符号はマイナス。
 			const int32_t scoreBoard = p[0][0] - p[1][0] + p[2][0];
-			// 手番に依存する評価値合計
 			const int32_t scoreTurn = p[0][1] + p[1][1] + p[2][1];
 #endif
 
-			// この関数は手番側から見た評価値を返すのでscoreTurnは必ずプラス
 
 			return (c == BLACK ? scoreBoard : -scoreBoard) + scoreTurn;
 		}
@@ -186,30 +160,23 @@ namespace Eval {
 		EvalSum operator + (const EvalSum & rhs) const { return EvalSum(*this) += rhs; }
 		EvalSum operator - (const EvalSum & rhs) const { return EvalSum(*this) -= rhs; }
 
-		// evaluate hashでatomicに操作できる必要があるのでそのための操作子
 		void encode()
 		{
 #if defined USE_AVX2
-			// EvalSum は atomic にコピーされるので key が合っていればデータも合っている。
 #else
 			key ^= data[0] ^ data[1] ^ data[2];
 #endif
 		}
-		// decode()はencode()の逆変換だが、xorなので逆変換も同じ変換。
 		void decode() { encode(); }
 
-		// 評価値が計算済みであるかを判定する。
-		// このEvalSumに値が入っていないときは、Position::do_move()にて
-		// p[0][0]にVALUE_NOT_EVALUATEDを設定することになっている。
 		bool evaluated() const { return p[0][0] != VALUE_NOT_EVALUATED; }
 
 		union {
-			// array<.. , 3>でいいが、この下のstructに合わせてpaddingしておく。
 			std::array<std::array<int32_t, 2>, 4> p;
 
 			struct {
 				u64 data[3];
-				u64 key; // EVAL_HASH用。pos.key() >> 1 したもの。
+				u64 key; 
 			};
 #if defined(USE_AVX2)
 			__m256i mm;
@@ -220,12 +187,10 @@ namespace Eval {
 		};
 	};
 
-	// 抑制していた警告を元に戻す。
 #if defined (__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic warning "-Wmaybe-uninitialized"
 #endif
 
-	// 出力用　デバッグ用。
 	static std::ostream& operator<<(std::ostream& os, const EvalSum& sum)
 	{
 		os << "sum BKPP   = " << sum.p[0][0] << " + " << sum.p[0][1] << std::endl;
@@ -234,12 +199,11 @@ namespace Eval {
 		return os;
 	}
 
-	// 比較演算子
 
 	static bool operator == (const EvalSum& lhs, const EvalSum rhs) { return lhs.p[0] == rhs.p[0] && lhs.p[1] == rhs.p[1] && lhs.p[2] == rhs.p[2]; }
 	static bool operator != (const EvalSum& lhs, const EvalSum rhs) { return !(lhs == rhs); }
 
-} // namespace Eval
-} // namespace YaneuraOu
+} 
+} 
 
-#endif // EVAL_SUM_H
+#endif 

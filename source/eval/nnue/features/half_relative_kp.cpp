@@ -1,4 +1,3 @@
-﻿// NNUE評価関数の入力特徴量HalfRelativeKPの定義
 
 #include "../../../config.h"
 
@@ -10,7 +9,6 @@
 namespace YaneuraOu {
 namespace Eval::NNUE::Features {
 
-// 玉の位置とBonaPieceから特徴量のインデックスを求める
 template <Side AssociatedKing>
 inline IndexType HalfRelativeKP<AssociatedKing>::MakeIndex(
     Square sq_k, BonaPiece p) {
@@ -23,7 +21,6 @@ inline IndexType HalfRelativeKP<AssociatedKing>::MakeIndex(
   return H * W * piece_index + H * relative_file + relative_rank;
 }
 
-// 駒の情報を取得する
 template <Side AssociatedKing>
 inline void HalfRelativeKP<AssociatedKing>::GetPieces(
     const Position& pos, Color perspective,
@@ -37,11 +34,9 @@ inline void HalfRelativeKP<AssociatedKing>::GetPieces(
   *sq_target_k = static_cast<Square>(((*pieces)[target] - f_king) % SQ_NB);
 }
 
-// 特徴量のうち、値が1であるインデックスのリストを取得する
 template <Side AssociatedKing>
 void HalfRelativeKP<AssociatedKing>::AppendActiveIndices(
     const Position& pos, Color perspective, IndexList* active) {
-  // コンパイラの警告を回避するため、配列サイズが小さい場合は何もしない
   if (RawFeatures::kMaxActiveDimensions < kMaxActiveDimensions) return;
 
   BonaPiece* pieces;
@@ -54,7 +49,6 @@ void HalfRelativeKP<AssociatedKing>::AppendActiveIndices(
   }
 }
 
-// 特徴量のうち、一手前から値が変化したインデックスのリストを取得する
 template <Side AssociatedKing>
 void HalfRelativeKP<AssociatedKing>::AppendChangedIndices(
     const Position& pos, Color perspective,
@@ -81,7 +75,7 @@ void HalfRelativeKP<AssociatedKing>::AppendChangedIndices(
 template class HalfRelativeKP<Side::kFriend>;
 template class HalfRelativeKP<Side::kEnemy>;
 
-} // namespace Eval::NNUE::Features
-} // namespace YaneuraOu
+} 
+} 
 
-#endif  // defined(EVAL_NNUE)
+#endif  

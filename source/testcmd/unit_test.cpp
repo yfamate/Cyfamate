@@ -1,4 +1,4 @@
-﻿#include "unit_test.h"
+#include "unit_test.h"
 
 #include <iostream>
 #include <sstream>
@@ -15,13 +15,7 @@ namespace YaneuraOu {
 namespace Test
 {
 
-	// --------------------
-	//      UnitTest
-	// --------------------
 
-	// UnitTest用。
-	// "test unittest"コマンドで用いる。
-	// 実際の使い方は、normal_test_cmd.cppのunit_test()とPosition::UnitTest()を見ること。
 
 	UnitTester::UnitTester()
 	{
@@ -47,8 +41,6 @@ namespace Test
 		cout << "=== Finish UnitTest === " << endl;
 	}
 
-	// Test用のコマンド
-	// 例) tester.test("局面の整合性テストその1",pos.is_ok());
 	void UnitTester::test(const std::string& message, bool b)
 	{
 		stringstream ss;
@@ -57,14 +49,12 @@ namespace Test
 
 		string right = b ? "passed" : "failed";
 
-		// 横、80文字ぐらいで収まるように。
 		auto padding = std::max((size_t)0, 79 - left.size() - right.size());
 
 		string mes = left + string(padding, '.') + right;
 
 		cout << mes << endl;
 
-		// errorがあったなら、summeryで表示するために保存しておく。
 		if (!b)
 			errors.emplace_back(mes);
 
@@ -73,7 +63,6 @@ namespace Test
 
 	void UnitTester::run(std::function<void(UnitTester&, IEngine& )> f)
 	{
-		// 対象の関数を実行する前に呼び出されるcallback
 		if (before_run)
 			before_run();
 
@@ -83,8 +72,6 @@ namespace Test
 			after_run();
 	}
 
-	// Sectionを作る。
-	// 使い方は、Position::UnitTest()を見ること。
 	const std::string UnitTester::section_name()
 	{
 		stringstream ss;
@@ -104,24 +91,14 @@ namespace Test
 		return ss.str();
 	}
 
-	// --------------------
-	// UnitTest本体。"unittest"コマンドで呼び出される。
-	// --------------------
 
-	// コマンド例
-	//	unittest
-	//	→　通常のUnitTest
-	//  unittest random_player_loop 1000
-	//  →　ランダムプレイヤーでの自己対局1000回を行うUnitTest
 
 	void UnitTest(istringstream& is, IEngine& engine)
 	{
-		// UnitTestを呼び出してくれるclass。
 		UnitTester tester;
 
-		// 入力文字列を解釈
 		string token;
-		s64 random_player_loop = 0; // ランダムプレイヤーの対局回数(0を指定するとskip)
+		s64 random_player_loop = 0; 
 		while (is >> token)
 		{
 			if (token == "random_player_loop")
@@ -129,36 +106,26 @@ namespace Test
 		}
 		cout << "random_player_loop : " << random_player_loop << endl;
 
-		// testerのoptionsに代入しておく。
 		tester.options.add("random_player_loop", Option(random_player_loop));
 
-		// --- 各classに対するUnitTest
 
 		tester.engine = &engine;
 
-		// Book namespace
 		tester.run(Book::UnitTest);
 
-		// Bitboard class
 		tester.run(Bitboard::UnitTest);
 		tester.run(Bitboard256::UnitTest);
 
-		// Position class
 		tester.run(Position::UnitTest);
 
-		// Transposition Table
 		tester.run(TranspositionTable::UnitTest);
 
-		// USI namespace
 		tester.run(USIEngine::UnitTest);
 
-		// Misc tools
 		tester.run(Misc::UnitTest);
 
-		// 指し手生成のテスト
-		//tester.run(MoveGen::UnitTest)
 
 	}
 
-} // namespace Test;
-} // namespace YaneuraOu;
+} 
+} 

@@ -1,5 +1,3 @@
-// Definition of layer AffineTransformCommonShardInputExplicit of NNUE evaluation function
-// SFNN common+shard L1用。全出力がcommonを見る一方、各出力groupは対応するshardだけを見る。
 
 #ifndef NNUE_LAYERS_AFFINE_TRANSFORM_COMMON_SHARD_INPUT_EXPLICIT_H_INCLUDED
 #define NNUE_LAYERS_AFFINE_TRANSFORM_COMMON_SHARD_INPUT_EXPLICIT_H_INCLUDED
@@ -14,12 +12,6 @@
 namespace YaneuraOu {
 namespace Eval::NNUE::Layers {
 
-// AffineTransform layer for common+shard dense input (Explicit Dimensions).
-//
-// The on-disk nn.bin layout is kept compatible with the ordinary SFNN fc_0:
-//   bias[OutputDimensions], weight[OutputDimensions][pad(InputDimensions)].
-// During ReadParameters(), only common weights and the selected shard weights
-// for each output are kept in memory.
 template <IndexType InputDimensions,
           IndexType OutputDimensions,
           IndexType CommonDimensions,
@@ -254,9 +246,9 @@ class AffineTransformCommonShardInputExplicit {
 	alignas(kCacheLineSize) WeightType weights_[kOutputDimensions * kPaddedEffectiveInputDimensions];
 };
 
-}  // namespace Eval::NNUE::Layers
-}  // namespace YaneuraOu
+}  
+}  
 
-#endif  // defined(EVAL_NNUE)
+#endif  
 
-#endif  // NNUE_LAYERS_AFFINE_TRANSFORM_COMMON_SHARD_INPUT_EXPLICIT_H_INCLUDED
+#endif  

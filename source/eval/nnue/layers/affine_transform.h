@@ -1,5 +1,3 @@
-﻿// Definition of layer AffineTransform of NNUE evaluation function
-// NNUE評価関数の層AffineTransformの定義
 
 #ifndef CLASSIC_NNUE_LAYERS_AFFINE_TRANSFORM_H_INCLUDED
 #define CLASSIC_NNUE_LAYERS_AFFINE_TRANSFORM_H_INCLUDED
@@ -30,7 +28,6 @@ static void affine_transform_unaligned(std::int32_t*       output,
     const __m256i       kZeros      = _mm256_setzero_si256();
     const auto          inputVector = reinterpret_cast<const __m256i*>(input);
 #elif defined(USE_SSE2)
-    // At least a multiple of 16, with SSE2.
     constexpr IndexType kNumChunks  = CeilToMultiple<IndexType>(kInputDimensions, 16) / 16;
     const __m128i       kZeros      = _mm_setzero_si128();
     const auto          inputVector = reinterpret_cast<const __m128i*>(input);
@@ -152,7 +149,6 @@ static void affine_transform_unaligned(std::int32_t*       output,
 #else
     std::memcpy(output, biases, sizeof(std::int32_t) * kOutputDimensions);
 
-    // Traverse weights in transpose order to take advantage of input sparsity
     for (IndexType i = 0; i < kInputDimensions; ++i)
         if (input[i])
         {
@@ -164,34 +160,22 @@ static void affine_transform_unaligned(std::int32_t*       output,
 #endif
 }
 
-// Affine transformation layer
-// アフィン変換層
 template <typename PreviousLayer, IndexType OutputDimensions>
 class AffineTransform {
    public:
-	// Input/output type
-	// 入出力の型
 	using InputType  = typename PreviousLayer::OutputType;
 	using OutputType = std::int32_t;
 	static_assert(std::is_same<InputType, std::uint8_t>::value, "");
 
-	// Number of input/output dimensions
-	// 入出力の次元数
 	static constexpr IndexType kInputDimensions       = PreviousLayer::kOutputDimensions;
 	static constexpr IndexType kOutputDimensions      = OutputDimensions;
 	static constexpr IndexType kPaddedInputDimensions = CeilToMultiple<IndexType>(kInputDimensions, kMaxSimdWidth);
 
-	// Size of forward propagation buffer used in this layer
-	// この層で使用する順伝播用バッファのサイズ
 	static constexpr std::size_t kSelfBufferSize =
 	    CeilToMultiple(kOutputDimensions * sizeof(OutputType), kCacheLineSize);
 
-	// Size of the forward propagation buffer used from the input layer to this layer
-	// 入力層からこの層までで使用する順伝播用バッファのサイズ
 	static constexpr std::size_t kBufferSize = PreviousLayer::kBufferSize + kSelfBufferSize;
 
-	// 評価関数ファイルに埋め込むハッシュ値
-	// Hash value embedded in the evaluation file
 	static constexpr std::uint32_t GetHashValue() {
 		std::uint32_t hash_value = 0xCC03DAE4u;
 		hash_value += kOutputDimensions;
@@ -200,7 +184,6 @@ class AffineTransform {
 		return hash_value;
 	}
 
-	// ハッシュ値を前段の値から更新するときのヘルパー
 	static constexpr std::uint32_t GetHashValue(std::uint32_t prevHash) {
 		std::uint32_t hash_value = 0xCC03DAE4u;
 		hash_value += kOutputDimensions;
@@ -209,7 +192,6 @@ class AffineTransform {
 		return hash_value;
 	}
 
-	// 入力層からこの層までの構造を表す文字列
 	static std::string GetStructureString() {
 		return "AffineTransform[" + std::to_string(kOutputDimensions) + "<-" + std::to_string(kInputDimensions) + "](" +
 		       PreviousLayer::GetStructureString() + ")";
@@ -228,8 +210,6 @@ class AffineTransform {
 #endif
     }
 
-	// Read network parameters
-	// パラメータを読み込む
 	Tools::Result ReadParameters(std::istream& stream) {
 		Tools::Result result = previous_layer_.ReadParameters(stream);
 		if (result.is_not_ok()) return result;
@@ -240,25 +220,20 @@ class AffineTransform {
 		return !stream.fail() ? Tools::ResultCode::Ok : Tools::ResultCode::FileReadError;
 	}
 
-	// パラメータを書き込む
 	bool WriteParameters(std::ostream& stream) const {
 		if (!previous_layer_.WriteParameters(stream))
 			return false;
-		// TODO : endiannessの調整するコード必要なのでは。(やね)
 		stream.write(reinterpret_cast<const char*>(biases_), kOutputDimensions * sizeof(BiasType));
 		stream.write(reinterpret_cast<const char*>(weights_),
 		             kOutputDimensions * kPaddedInputDimensions * sizeof(WeightType));
 		return !stream.fail();
 	}
 
-	// Forward propagation
-	// 順伝播
 	const OutputType* Propagate(const TransformedFeatureType* transformed_features, char* buffer) const {
 		const auto input = previous_layer_.Propagate(transformed_features, buffer + kSelfBufferSize);
 
 #if defined(USE_WASM_SIMD)
 		{
-			// Simplify variable names (y = Ax + b)
 			constexpr int n = kInputDimensions;
 			constexpr int m = kOutputDimensions;
 			constexpr int n_stride = kPaddedInputDimensions;
@@ -402,8 +377,6 @@ class AffineTransform {
 		}
 		else if constexpr (kOutputDimensions == 1)
 		{
-    // We cannot use AVX512 for the last layer because there are only 32 inputs
-    // and the buffer is not padded to 64 elements.
 #if defined(USE_AVX2)
 			using vec_t = __m256i;
 #define vec_setzero() _mm256_setzero_si256()
@@ -450,7 +423,6 @@ class AffineTransform {
 		}
 
 #else
-        // Use dense implementation for the other architectures.
         affine_transform_unaligned<kInputDimensions, kPaddedInputDimensions, kOutputDimensions>(
           output, weights_, biases_, input);
 #endif
@@ -459,21 +431,18 @@ class AffineTransform {
 	}
 
    private:
-	// パラメータの型
 	using BiasType   = OutputType;
 	using WeightType = std::int8_t;
 
-	// この層の直前の層
 	PreviousLayer previous_layer_;
 
-	// パラメータ
 	alignas(kCacheLineSize) BiasType biases_[kOutputDimensions];
 	alignas(kCacheLineSize) WeightType weights_[kOutputDimensions * kPaddedInputDimensions];
 };
 
-} // namespace Eval::NNUE::Layers
-} // namespace YaneuraOu
+} 
+} 
 
-#endif  // defined(EVAL_NNUE)
+#endif  
 
-#endif  // #ifndef NNUE_LAYERS_AFFINE_TRANSFORM_H_INCLUDED
+#endif  

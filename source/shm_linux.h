@@ -1,4 +1,4 @@
-﻿/*
+/*
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2026 The Stockfish developers (see AUTHORS file)
 
@@ -102,11 +102,8 @@ class CleanupHooks {
     static std::once_flag register_once_;
 
     static void handle_signal(int sig) noexcept {
-        // Search threads may still be running, so skip munmap (but still perform
-        // other cleanup actions). The memory mappings will be released on exit.
         SharedMemoryRegistry::cleanup_all(true);
 
-        // Invoke the default handler, which will exit
         struct sigaction sa;
         sa.sa_handler = SIG_DFL;
         sigemptyset(&sa.sa_mask);
@@ -158,7 +155,7 @@ inline int portable_fallocate(int fd, off_t offset, off_t length) {
 #endif
 }
 
-}  // namespace detail
+}  
 
 template<typename T>
 class SharedMemory: public detail::SharedMemoryBase {
@@ -184,8 +181,6 @@ class SharedMemory: public detail::SharedMemoryBase {
 
     static std::string make_sentinel_base(const std::string& name) {
         char buf[32];
-        // Using std::to_string here causes non-deterministic PGO builds.
-        // snprintf, being part of libc, is insensitive to the formatted values.
         std::snprintf(buf, sizeof(buf), "sfshm_%016" PRIu64, hash_string(name));
         return buf;
     }
@@ -464,7 +459,6 @@ class SharedMemory: public detail::SharedMemoryBase {
 
     std::string sentinel_full_path(pid_t pid) const {
         char buf[1024];
-        // See above snprintf comment
         std::snprintf(buf, sizeof(buf), "/dev/shm/%s.%ld", sentinel_base_.c_str(), long(pid));
         return buf;
     }
@@ -688,6 +682,6 @@ template<typename T>
     return std::nullopt;
 }
 
-}  // namespace YaneuraOu::shm
+}  
 
-#endif  // #ifndef SHM_LINUX_H_INCLUDED
+#endif  

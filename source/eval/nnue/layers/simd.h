@@ -1,4 +1,4 @@
-﻿#ifndef CLASSIC_SIMD_H_INCLUDED
+#ifndef CLASSIC_SIMD_H_INCLUDED
 #define CLASSIC_SIMD_H_INCLUDED
 
 #if defined(USE_AVX2)
@@ -17,9 +17,6 @@
     #include <arm_neon.h>
 #endif
 
-// CPU capability switch for NNUE dot-product code. For SFNN H1=7 networks
-// (fc0: ->8, packed tail: 14->64->1), measured AVX512VNNI was slower than
-// AVX512 maddubs/madd, so only that NNUE shape uses the fallback.
 #if defined(USE_VNNI) && !defined(NNUE_SFNN_HIDDEN1_7)
     #define USE_NNUE_VNNI
 #endif
@@ -79,8 +76,8 @@ namespace Simd
 #if defined(USE_SSSE3)
 
 [[maybe_unused]] static int m128_hadd(__m128i sum, int bias) {
-    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x4E));  //_MM_PERM_BADC
-    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xB1));  //_MM_PERM_CDAB
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0x4E));  
+    sum = _mm_add_epi32(sum, _mm_shuffle_epi32(sum, 0xB1));  
     return _mm_cvtsi128_si32(sum) + bias;
 }
 
@@ -127,7 +124,7 @@ namespace Simd
 #endif
 
 
-} // namespace Simd 
-} // namespace YaneuraOu
+} 
+} 
 
-#endif // ifndef SIMD_H_INCLUDED
+#endif 

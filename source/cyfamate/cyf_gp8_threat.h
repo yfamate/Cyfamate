@@ -1,29 +1,4 @@
-// Research build (ARCH-NEXT, 2026-10-07): GP-bucket routing with the boundary list read from
-// the evaluation-file header, and step-attacker threat features in raw (non-mirrored) squares.
-// Included from cyfamate.cpp once Position / Bitboard / effects are defined. The production
-// source does not include this file.
-//
-// Threat index = pair_base[attacker_side][attacker_class][attacked_side][attacked_class]
-//              + from_offset[pattern][from_n] + attack_order[pattern][from_n][to_n]
-// with the tables built exactly as tatara's crates/shogi-features/src/threat.rs builds them
-// (empty-board step/ray walks in (file, rank) coordinates, targets in ascending raw order),
-// profile 3 (step-attacker: lance / bishop / rook / horse / dragon never attack) and the
-// perspective normalisation "Black: raw square, White: 180-degree rotation" without the
-// half-mirror (tatara `--threat-mirror off`).
-//
-// v7 (2026-10-08): the incremental edge enumeration
-// is table-driven (changed_indices): per changed square one "who can attack this square"
-// bitboard (step_reach) shared by the before/after boards, piece-indexed reverse-attack and
-// effect tables, and the two perspective indices computed directly from (attacker piece,
-// target piece, from, to) without an Edge intermediate. The v5 enumeration (changed_edges,
-// ClassBB) is kept under CYF_THREAT_ENUM_V5 for paired measurements; both produce the same
-// index multisets (bit-identical accumulators). Two variants of this file were measured and
-// rejected (v7b: branch-free candidate loop with 64-bit pop loops, +6% per evaluation; v7c =
-// work/cyf_gp8_threat.v7c.h: shared attacker-side index part and both perspectives' pair_base
-// in one table, +1.5%); engine/COST_v7_3way_w512.json, engine/COST_v7ac_w512.json.
 #pragma once
-// [threat-speed-20261009] v8 enumeration (changed_indices_v8) wherever AVX512-VBMI is available; same index multisets
-// as v7 (bit-identical accumulators). Opt out with CYF_THREAT_ENUM_NO_V8.
 #if defined(__AVX512VBMI__) && !defined(CYF_THREAT_ENUM_NO_V8) && !defined(CYF_THREAT_ENUM_V5)
 #define CYF_THREAT_ENUM_V8 1
 #endif
@@ -38,27 +13,52 @@ namespace YaneuraOu {
 namespace Cyfamate {
 namespace Gp8 {
 
-// ---- routing read from the header -------------------------------------------------
 constexpr int kMaxStacks = 9;
 inline int stacks = 5;
 inline double bounds[kMaxStacks - 1] = {0.4, 0.6, 0.8, 1.0, 0.0, 0.0, 0.0, 0.0};
-inline std::string arch_string;          // architecture string of the loaded file
-inline std::uint32_t top_hash = 0;       // top-level hash of the loaded file
-inline bool threat_enabled = false;      // file carries a threat block
-inline bool fixed_gp5 = true;            // 1024 / 7+1 or 15+1 / 64 / 5 / GP(0.4,0.6,0.8,1), no threat
+inline std::string arch_string;          
+inline std::uint32_t top_hash = 0;       
+inline bool threat_enabled = false;      
+inline bool fixed_gp5 = true;            
+inline bool hm = false;
+constexpr int kHmRows = 45 * 1629;
 
-constexpr std::uint32_t kTagGp5 = 0x35475000u;    // "5GP\0"
-constexpr std::uint32_t kTagGpk = 0x004B5047u;    // "GPK\0"
-constexpr std::uint32_t kTagH15 = 0x35314831u;    // "1H15"
-constexpr std::uint32_t kTagThreat = 0x54524854u; // "THRT"
+struct LoadedState {
+    int stacks_;
+    double bounds_[kMaxStacks - 1];
+    std::string arch_string_;
+    std::uint32_t top_hash_;
+    bool threat_enabled_, fixed_gp5_, hm_;
+
+    static LoadedState save() {
+        LoadedState s{stacks, {}, arch_string, top_hash, threat_enabled, fixed_gp5, hm};
+        std::copy(std::begin(bounds), std::end(bounds), s.bounds_);
+        return s;
+    }
+    void restore() const {
+        stacks = stacks_;
+        std::copy(std::begin(bounds_), std::end(bounds_), bounds);
+        arch_string = arch_string_;
+        top_hash = top_hash_;
+        threat_enabled = threat_enabled_;
+        fixed_gp5 = fixed_gp5_;
+        hm = hm_;
+    }
+};
+
+constexpr std::uint32_t kTagGp5 = 0x35475000u;    
+constexpr std::uint32_t kTagGpk = 0x004B5047u;    
+constexpr std::uint32_t kTagH15 = 0x35314831u;    
+constexpr std::uint32_t kTagThreat = 0x54524854u; 
+constexpr std::uint32_t kTagHm = 0x00004D48u;     
 
 struct ParsedArch {
     int ft_out = 0, h1 = 0, h2 = 0, stacks = 0;
     std::vector<double> bounds;
-    bool threat = false, mirror_off = false;
+    bool threat = false, mirror_off = false, hm = false;
     int threat_dims = 0, threat_profile = 0;
-    int l1_main_scale = 0;      // ";L1MainScale=256" attribute of the fixed GP5 variants (0 = absent)
-    bool ft_scale_254 = false;  // ";FTScale=254" attribute
+    int l1_main_scale = 0;      
+    bool ft_scale_254 = false;  
     std::string error;
 };
 
@@ -71,18 +71,18 @@ inline bool parse_number(const std::string& s, std::size_t& p, int& out) {
     return true;
 }
 
-// Parses "ModelType=SFNNWithoutPsqt;Features=HalfKA2(Friend)[131949->Wx2][,Threat=..,
-// ThreatProfile=..[,ThreatMirror=off]],Network=SFNN_HALFKA2_W_h1_h2_NGP{LayerStack=N;Bucket=GP(..)}".
 inline ParsedArch parse_arch(const std::string& a) {
     ParsedArch r;
     const std::string prefix = "ModelType=SFNNWithoutPsqt;Features=HalfKA2(Friend)[131949->";
-    if (a.compare(0, prefix.size(), prefix) != 0) { r.error = "not a Cyfamate HalfKA2 file"; return r; }
-    std::size_t p = prefix.size();
+    const std::string prefix_hm = "ModelType=SFNNWithoutPsqt;Features=HalfKA2_hm(Friend)[73305->";
+    std::size_t p;
+    if (a.compare(0, prefix.size(), prefix) == 0) p = prefix.size();
+    else if (a.compare(0, prefix_hm.size(), prefix_hm) == 0) { r.hm = true; p = prefix_hm.size(); }
+    else { r.error = "not a Cyfamate HalfKA2 file"; return r; }
     if (!parse_number(a, p, r.ft_out) || a.compare(p, 3, "x2]") != 0) { r.error = "bad Features token"; return r; }
     p += 3;
     const std::size_t net = a.find(",Network=", p);
     if (net == std::string::npos) { r.error = "no Network token"; return r; }
-    // optional tokens between Features and Network
     std::size_t t = p;
     while (t < net) {
         if (a[t] != ',') { r.error = "bad token separator"; return r; }
@@ -117,7 +117,6 @@ inline ParsedArch parse_arch(const std::string& a) {
     p += 11;
     const std::size_t close = a.find(')', p);
     if (close == std::string::npos) { r.error = "bad Bucket list"; return r; }
-    // optional ";Key=Value" attributes of the fixed GP5 variants, then the closing brace
     std::size_t q = close + 1;
     while (q < a.size() && a[q] == ';') {
         std::size_t e = a.find_first_of(";}", q + 1);
@@ -147,7 +146,7 @@ inline ParsedArch parse_arch(const std::string& a) {
 }
 
 inline bool is_fixed_gp5(const ParsedArch& r) {
-    return !r.threat && r.ft_out == 1024 && r.h2 == 64 && (r.h1 == 7 || r.h1 == 15) && r.stacks == 5
+    return !r.threat && !r.hm && r.ft_out == 1024 && r.h2 == 64 && (r.h1 == 7 || r.h1 == 15) && r.stacks == 5
         && r.bounds.size() == 4 && r.bounds[0] == 0.4 && r.bounds[1] == 0.6 && r.bounds[2] == 0.8 && r.bounds[3] == 1.0;
 }
 
@@ -156,17 +155,16 @@ inline std::uint32_t expected_top_hash(const ParsedArch& r, std::uint32_t base) 
     if (!is_fixed_gp5(r)) h ^= kTagGpk;
     if (r.h1 == 15) h ^= kTagH15;
     if (r.threat) h ^= kTagThreat;
+    if (r.hm) h ^= kTagHm;
     return h;
 }
 
-// ---- threat tables ------------------------------------------------------------------
 namespace Threat {
 
 constexpr int kDims = 33408;
 constexpr int kMaxActive = 128;
 constexpr int kClasses = 9;
 
-// Sorted list of active threat indices of one perspective.
 struct List {
     std::uint32_t v[kMaxActive];
     int n = 0;
@@ -176,16 +174,11 @@ constexpr int kPatterns = 14;
 constexpr int kAttacksPerColor[kClasses] = {72, 324, 112, 328, 416, 816, 1296, 1104, 1552};
 
 #if defined(CYF_EVAL_PROFILE)
-// [CHAT-G] sub-costs of one incremental threat update (rdtsc cycles): changed-square
-// collection, bitboard set-up (v5 only), edge enumeration, index mapping (v5: separate pass;
-// v7: fused into enum), row prefetch. calls = number of threat_changes calls, changed_sq =
-// changed squares seen, cand = attacker candidates examined (v7).
 struct EnumProf { std::uint64_t collect_cyc = 0, bb_cyc = 0, enum_cyc = 0, index_cyc = 0, prefetch_cyc = 0,
                   calls = 0, changed_sq = 0, cand = 0, full_enum_cyc = 0, full_sort_cyc = 0, full_n = 0; };
 inline EnumProf& enum_prof() { static EnumProf p; return p; }
 #endif
 
-// tatara ThreatClass order: Pawn 0, Lance 1, Knight 2, Silver 3, GoldLike 4, Bishop 5, Rook 6, Horse 7, Dragon 8.
 inline int class_of(PieceType pt) {
     switch (pt) {
     case PAWN: return 0;
@@ -197,29 +190,22 @@ inline int class_of(PieceType pt) {
     case ROOK: return 6;
     case HORSE: return 7;
     case DRAGON: return 8;
-    default: return -1;   // king / none
+    default: return -1;   
     }
 }
 inline bool is_step(int cls) { return cls == 0 || cls == 2 || cls == 3 || cls == 4; }
-inline bool excluded_attacker(int ac) { return ac == 1 || ac >= 5; }   // profile 3 (step-attacker)
+inline bool excluded_attacker(int ac) { return ac == 1 || ac >= 5; }   
 
 struct Tables {
     std::int32_t pair_base[2][kClasses][2][kClasses];
     std::int32_t from_offset[kPatterns][81];
     std::uint8_t attack_order[kPatterns][81][81];
-    // L1-sized copies for the step patterns (the only attackers of profile 3): pattern slot
-    // = (oriented white ? 4 : 0) + {pawn 0, knight 1, silver 2, gold 3}; the attack order is
-    // indexed by the target delta (to - from, raw squares) + 11, which covers every step
-    // target (files +-1 -> +-9, ranks +-1/+-2). attack_order (118 KB) stays for the sliders.
     std::int32_t step_from_offset[8][81];
     std::uint8_t step_order[8][81][24];
     int dims = 0;
 };
 inline constexpr std::int8_t kStepSlot[kClasses] = {0, -1, 1, 2, 3, -1, -1, -1, -1};
 
-// Empty-board targets of a piece of threat class `cls` and colour `white` (0 black / 1 white)
-// standing on raw square `from` (index = file * 9 + rank, rank 0 = the first rank, Black moves
-// towards rank 0). Same walk as tatara `walk_attacks`; result sorted ascending.
 inline void empty_board_targets(int cls, int white, int from, std::vector<int>& out) {
     out.clear();
     const int file = from / 9, rank = from % 9;
@@ -287,7 +273,7 @@ inline const Tables& tables() {
                     const std::uint8_t ord = tb.attack_order[pat][from][to];
                     if (ord == 0xff) continue;
                     const int d = to - from + 11;
-                    tb.step_order[slot][from][d] = ord;   // d is within 0..22 for every step target
+                    tb.step_order[slot][from][d] = ord;   
                 }
             }
         }
@@ -296,24 +282,22 @@ inline const Tables& tables() {
     return t;
 }
 
-// One attack edge in raw board terms.
 struct Edge {
     std::uint8_t from, to;
     std::int8_t a_class, t_class;
     std::uint8_t a_white, t_white;
 };
 
-// Threat index of `e` seen from `perspective` (raw squares, no mirror). -1 when excluded.
 inline int index_of(const Edge& e, Color perspective) {
     const Tables& t = tables();
     const int pw = perspective == WHITE;
     const int as = e.a_white != pw, ds = e.t_white != pw;
     const int base = t.pair_base[as][e.a_class][ds][e.t_class];
     if (base < 0) return -1;
-    const int oriented_white = e.a_white != pw;   // Black perspective: attacker colour; White: flipped
+    const int oriented_white = e.a_white != pw;   
     const int from_n = pw ? 80 - e.from : e.from;
     const int to_n = pw ? 80 - e.to : e.to;
-    if (is_step(e.a_class)) {   // L1 tables; same values as the generic lookup below
+    if (is_step(e.a_class)) {   
         const int slot = (oriented_white ? 4 : 0) + kStepSlot[e.a_class];
         return base + t.step_from_offset[slot][from_n] + t.step_order[slot][from_n][to_n - from_n + 11];
     }
@@ -332,7 +316,6 @@ inline Bitboard step_effect(int cls, Color c, Square s) {
     }
 }
 
-// All edges of the current board.
 template <typename F>
 inline void for_each_edge(const Position& pos, F f) {
     const Bitboard targets = pos.pieces() ^ (pos.pieces(BLACK, KING) | pos.pieces(WHITE, KING));
@@ -354,38 +337,30 @@ inline void for_each_edge(const Position& pos, F f) {
     }
 }
 
-// Board location of a Black-view BonaPiece; false for hand pieces and kings.
 inline bool bona_board(int bp, Square& sq, int& cls, Color& col) {
     if (bp < int(Eval::fe_hand_end) || bp >= int(Eval::f_king)) return false;
     const int idx = bp - int(Eval::fe_hand_end);
     const int plane = idx / 81;
-    static constexpr std::int8_t kClassOfPlane[9] = {0, 1, 2, 3, 4, 5, 7, 6, 8};   // pawn lance knight silver gold bishop horse rook dragon
+    static constexpr std::int8_t kClassOfPlane[9] = {0, 1, 2, 3, 4, 5, 7, 6, 8};   
     sq = Square(idx % 81);
     col = (plane & 1) ? WHITE : BLACK;
     cls = kClassOfPlane[plane / 2];
     return true;
 }
 
-// Golden vector of tatara `canonical_startpos_step_attacker_indices_no_mirror` (Black view).
 inline const std::vector<int>& startpos_golden() {
     static const std::vector<int> g = {1315, 1316, 1399, 1400, 5215, 5381, 10643, 10746,
                                        19015, 19016, 19099, 19100, 24672, 25162, 31045, 31148};
     return g;
 }
 
-// =====================================================================================
-// v7: piece-indexed tables and the table-driven incremental enumeration.
-// =====================================================================================
 
-// Built on first use, which is after Bitboards::init() in both the engine (isready -> net
-// load) and the dump tool (explicit init before the net is read): step_reach uses the effect
-// tables, rev_attack is derived from a central square.
 struct Fast {
-    std::int8_t cls_of_piece[PIECE_NB];        // -1 for none / king / pseudo pieces
-    std::uint8_t rev_attack[PIECE_NB][24];     // piece p on sp attacks sp + (d - 11)? valid when sp is in step_reach[sp + d - 11]
-    const Bitboard* step_eff[PIECE_NB];        // &XEffectBB[0][colour] of a step piece (index [2 * sq]); nullptr otherwise
-    Bitboard step_reach[SQ_NB];                // squares from which some step piece of either colour attacks sq
-    Piece piece_of_plane[18];                  // BonaPiece board plane -> canonical piece (gold-likes -> GOLD)
+    std::int8_t cls_of_piece[PIECE_NB];        
+    std::uint8_t rev_attack[PIECE_NB][24];     
+    const Bitboard* step_eff[PIECE_NB];        
+    Bitboard step_reach[SQ_NB];                
+    Piece piece_of_plane[18];                  
 };
 inline const Fast& fast() {
     static const Fast f = [] {
@@ -404,8 +379,6 @@ inline const Fast& fast() {
                 case 3: t.step_eff[p] = &BB_Table::SilverEffectBB[0][c]; break;
                 default: t.step_eff[p] = &BB_Table::GoldEffectBB[0][c]; break;
                 }
-                // Reverse-attack table from the central square (file 4, rank 4 = 40): every
-                // step target exists there, and the pattern is translation-invariant.
                 constexpr int kCentre = 4 * 9 + 4;
                 Bitboard eff = step_effect(cls, c, Square(kCentre));
                 while (eff) {
@@ -424,12 +397,9 @@ inline const Fast& fast() {
     return f;
 }
 
-// Appends to out[BLACK] / out[WHITE] the two perspective indices of the step edge
-// "attacker piece ap on `from` attacks target piece tp on `to`" (raw squares, adjacency
-// guaranteed by the caller). Same values as index_of(Edge{...}, BLACK / WHITE).
 inline void emit2(const Tables& t, const Fast& f, Piece ap, Piece tp, int from, int to, List* out) {
     const int ac = f.cls_of_piece[ap], tc = f.cls_of_piece[tp];
-    const int aw = ap >> 4, tw = tp >> 4;   // PIECE_WHITE == 16
+    const int aw = ap >> 4, tw = tp >> 4;   
     const int slot_b = (aw ? 4 : 0) + kStepSlot[ac];
     out[BLACK].push(t.pair_base[aw][ac][tw][tc] + t.step_from_offset[slot_b][from] + t.step_order[slot_b][from][to - from + 11]);
     const int as = aw ^ 1, ds = tw ^ 1;
@@ -437,7 +407,6 @@ inline void emit2(const Tables& t, const Fast& f, Piece ap, Piece tp, int from, 
     const int fn = 80 - from;
     out[WHITE].push(t.pair_base[as][ac][ds][tc] + t.step_from_offset[slot_w][fn] + t.step_order[slot_w][fn][from - to + 11]);
 }
-// One perspective only.
 inline void emit1(const Tables& t, const Fast& f, Piece ap, Piece tp, int from, int to, Color perspective, List& out) {
     const int ac = f.cls_of_piece[ap], tc = f.cls_of_piece[tp];
     const int pw = perspective == WHITE;
@@ -448,8 +417,6 @@ inline void emit1(const Tables& t, const Fast& f, Piece ap, Piece tp, int from, 
     out.push(t.pair_base[as][ac][ds][tc] + t.step_from_offset[slot][fn] + t.step_order[slot][fn][d]);
 }
 
-// The squares touched by one or two plies with the occupant before the oldest ply and on the
-// current board (NO_PIECE = empty; kings are kept as pieces and excluded by cls_of_piece < 0).
 struct ChangedSq {
     Square sq[6];
     Piece before[6], after[6];
@@ -476,9 +443,6 @@ inline bool bona_square(const Fast& f, int bp, Square& sq, Piece& pc) {
     return true;
 }
 
-// Changed squares of `nplies` plies (oldest first) with the occupants before the oldest ply:
-// walking the plies newest first, a ply's destinations become empty and its sources get the
-// old piece, so the last write is the state before the oldest ply.
 inline void collect_changed_pieces(const Fast& f, const Position& pos, const Eval::DirtyPiece* const* plies, int nplies, ChangedSq& ch) {
     ch.n = 0;
     for (int k = nplies - 1; k >= 0; --k) {
@@ -494,12 +458,6 @@ inline void collect_changed_pieces(const Fast& f, const Position& pos, const Eva
     }
 }
 
-// Threat indices removed / added by the given plies, per perspective (v7). For each changed
-// square s: (a) the step pieces on unchanged squares that attack s (one bitboard
-// `step_reach[s] & non-king occupancy & ~changed`, then a per-piece reverse-attack test) give
-// a removed edge to the old occupant and an added edge to the new one; (b) the old occupant,
-// if a step piece, attacks targets on the board before the plies; (c) the new occupant
-// likewise on the current board. Edges between two changed squares come from (b)/(c) only.
 inline void changed_indices(const Position& pos, const Eval::DirtyPiece* const* plies, int nplies, List removed[2], List added[2]) {
     const Tables& t = tables();
     const Fast& f = fast();
@@ -561,17 +519,9 @@ inline void changed_indices(const Position& pos, const Eval::DirtyPiece* const* 
 }
 
 #if defined(CYF_THREAT_ENUM_V8)
-// =====================================================================================
-// v8 (threat-speed-20261009): the v7 enumeration with the per-candidate reverse-attack test
-// done branch-free for all neighbours of a changed square at once. Per square s the (up to 12)
-// squares of step_reach[s] are a fixed byte list; their occupants are gathered from the board
-// bytes with one VBMI permute, and lane j tests bit `piece` of amask[s][j] = {pieces that attack
-// s from neighbour j}. Only real attackers reach the emit loop (v7: 5.2 candidates per update,
-// about half rejected by an unpredictable branch). Same index multisets as v7.
-// =====================================================================================
 struct NbTable {
-    alignas(16) std::uint8_t sq[SQ_NB][16];       // neighbour squares (pad: SQ_NB, the board sentinel byte)
-    alignas(64) std::uint32_t amask[SQ_NB][16];   // bit p: piece p on sq[s][j] attacks s
+    alignas(16) std::uint8_t sq[SQ_NB][16];       
+    alignas(64) std::uint32_t amask[SQ_NB][16];   
     std::uint8_t n[SQ_NB];
 };
 inline const NbTable& nb_table() {
@@ -613,8 +563,8 @@ inline void changed_indices_v8(const Position& pos, const Eval::DirtyPiece* cons
         if (f.cls_of_piece[ch.before[i]] >= 0) nonking_before |= Bitboard(ch.sq[i]);
     const std::uint8_t* board = reinterpret_cast<const std::uint8_t*>(pos.piece_array().data());
     static_assert(sizeof(Piece) == 1);
-    const __m512i b_lo = _mm512_loadu_si512(board);                                        // squares 0..63
-    const __m512i b_hi = _mm512_maskz_loadu_epi8((__mmask64(1) << (SQ_NB + 1 - 64)) - 1, board + 64);   // 64..81 (81 = sentinel)
+    const __m512i b_lo = _mm512_loadu_si512(board);                                        
+    const __m512i b_hi = _mm512_maskz_loadu_epi8((__mmask64(1) << (SQ_NB + 1 - 64)) - 1, board + 64);   
     const __m512i one = _mm512_set1_epi32(1);
     for (int i = 0; i < ch.n; ++i) {
         const Square s = ch.sq[i];
@@ -624,11 +574,11 @@ inline void changed_indices_v8(const Position& pos, const Eval::DirtyPiece* cons
             const __m512i idx = _mm512_castsi128_si512(_mm_load_si128(reinterpret_cast<const __m128i*>(nt.sq[s])));
             const __m512i occ = _mm512_cvtepu8_epi32(_mm512_castsi512_si128(_mm512_permutex2var_epi8(b_lo, idx, b_hi)));
             const __m512i hit = _mm512_srlv_epi32(_mm512_load_si512(nt.amask[s]), occ);
-            std::uint32_t lanes = _mm512_test_epi32_mask(hit, one);   // neighbours whose occupant attacks s (current board)
+            std::uint32_t lanes = _mm512_test_epi32_mask(hit, one);   
             while (lanes) {
                 const int j = __builtin_ctz(lanes); lanes &= lanes - 1;
                 const Square sp = Square(nt.sq[s][j]);
-                if (chmask.test(sp)) continue;   // changed neighbours: their edges come from (b)/(c) below
+                if (chmask.test(sp)) continue;   
                 const Piece p = Piece(board[sp]);
                 if (btc >= 0) emit2(t, f, p, bp, sp, s, removed);
                 if (atc >= 0) emit2(t, f, p, ap, sp, s, added);
@@ -653,7 +603,6 @@ inline void changed_indices_v8(const Position& pos, const Eval::DirtyPiece* cons
 }
 #endif
 
-// All active threat indices of `pos` from `perspective`, ascending (v7 full enumeration).
 inline void all_indices(const Position& pos, Color perspective, List& out) {
     const Tables& t = tables();
     const Fast& f = fast();
@@ -687,12 +636,7 @@ inline void all_indices(const Position& pos, Color perspective, List& out) {
 }
 
 #if defined(CYF_THREAT_ENUM_V5)
-// =====================================================================================
-// v5 enumeration (CHAT-C final), kept for paired measurements.
-// =====================================================================================
 
-// The squares touched by one or two plies with their occupant before the oldest ply (b*) and
-// on the current board (a*): class -2 = empty, -1 = king, 0..8 = threat class.
 struct Changed {
     Square sq[6];
     std::int8_t bcls[6], acls[6];
@@ -702,7 +646,6 @@ struct Changed {
         for (int i = 0; i < n; ++i) if (sq[i] == s) return i;
         return -1;
     }
-    // Registers s (current occupant from the board); the "before" state starts equal.
     int add(const Position& pos, Square s) {
         const int i = find(s);
         if (i >= 0) return i;
@@ -715,26 +658,21 @@ struct Changed {
     }
 };
 
-// Step-attacker bitboards of a board: per colour the pawns / knights / silvers / gold-likes
-// (index = threat class; 1 unused) and the non-king occupancy.
 struct ClassBB {
     Bitboard cls[2][5];
     Bitboard nonking;
 };
 
-// Edges of one board (Before: the board before the plies, else the current board) that touch
-// the changed squares. `bb` are that board's step bitboards, `chmask` the changed squares.
-// Edges between two changed squares are reported once (from the attacker's square).
 template <bool Before, typename F>
 inline void edges_of(const Position& pos, const Changed& ch, const ClassBB& bb, Bitboard chmask, F f) {
     const Bitboard not_ch = ~chmask;
     for (int i = 0; i < ch.n; ++i) {
         const Square s = ch.sq[i];
         const int c = Before ? ch.bcls[i] : ch.acls[i];
-        if (c < 0) continue;   // empty, or a king (never an attacker of this profile, never a target)
+        if (c < 0) continue;   
         const Color co = Before ? ch.bcol[i] : ch.acol[i];
         if (is_step(c)) {
-            Bitboard t = step_effect(c, co, s) & bb.nonking;   // non-king occupied targets only
+            Bitboard t = step_effect(c, co, s) & bb.nonking;   
             while (t) {
                 const Square to = t.pop();
                 int tc; Color tco;
@@ -746,7 +684,6 @@ inline void edges_of(const Position& pos, const Changed& ch, const ClassBB& bb, 
         }
         for (Color ac : {BLACK, WHITE}) {
             for (int k : {0, 2, 3, 4}) {
-                // a step piece of class k and colour ac attacks s iff it stands on the reverse step.
                 Bitboard att = bb.cls[ac][k] & step_effect(k, ~ac, s) & not_ch;
                 while (att) {
                     const Square sp = att.pop();
@@ -757,7 +694,6 @@ inline void edges_of(const Position& pos, const Changed& ch, const ClassBB& bb, 
     }
 }
 
-// Changed squares of `nplies` plies (oldest first) with the occupants before the oldest ply.
 inline void collect_changed(const Position& pos, const Eval::DirtyPiece* const* plies, int nplies, Changed& ch) {
     ch.n = 0;
     for (int k = nplies - 1; k >= 0; --k) {
@@ -773,7 +709,6 @@ inline void collect_changed(const Position& pos, const Eval::DirtyPiece* const* 
     }
 }
 
-// Edges removed / added by the given plies, as raw edges (the caller maps them per perspective).
 inline void changed_edges(const Position& pos, const Eval::DirtyPiece* const* plies, int nplies,
                           std::vector<Edge>& removed, std::vector<Edge>& added) {
     removed.clear(); added.clear();
@@ -798,7 +733,6 @@ inline void changed_edges(const Position& pos, const Eval::DirtyPiece* const* pl
         now.cls[c][4] = pos.pieces(c, GOLDS);
     }
     now.nonking = pos.pieces() ^ (pos.pieces(BLACK, KING) | pos.pieces(WHITE, KING));
-    // The board before the plies differs from the current one only on the changed squares.
     ClassBB before = now;
     Bitboard chmask(ZERO);
     for (int i = 0; i < ch.n; ++i) {
@@ -823,9 +757,9 @@ inline void changed_edges(const Position& pos, const Eval::DirtyPiece* const* pl
     ep.enum_cyc += __rdtsc() - t2;
 #endif
 }
-#endif  // CYF_THREAT_ENUM_V5
+#endif  
 
-}  // namespace Threat
-}  // namespace Gp8
-}  // namespace Cyfamate
-}  // namespace YaneuraOu
+}  
+}  
+}  
+}  

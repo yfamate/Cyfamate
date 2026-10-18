@@ -1,4 +1,3 @@
-// SFNN without PSQT architecture
 
 #ifndef CLASSIC_NNUE_SFNN_SFNN_HALFKA2_1024_7_64_K3K3_H_INCLUDED
 #define CLASSIC_NNUE_SFNN_SFNN_HALFKA2_1024_7_64_K3K3_H_INCLUDED
@@ -12,20 +11,40 @@
 namespace YaneuraOu {
 namespace Eval::NNUE {
 
-// Input features used in evaluation function
-// 評価関数で用いる入力特徴量
 
     using RawFeatures = Features::FeatureSet<
         Features::HalfKA2<Features::Side::kFriend>>;
 
-    // Number of input feature dimensions after conversion
-    // 変換後の入力特徴量の次元数
+#if defined(CYF_GP8)
+#if !defined(CYF_FT_WIDTH)
+#define CYF_FT_WIDTH 1024
+#endif
+    constexpr IndexType kTransformedFeatureDimensions = CYF_FT_WIDTH;
+#else
     constexpr IndexType kTransformedFeatureDimensions = 1024;
+#endif 
 
-    // 小幅SFNN専用。従来幅のSFNNでは定義せず、既存の高速経路をそのまま使う。
     
 
-    // Number of networks stored in the evaluation file
+#if defined(CYFAMATE_NNUE_5GP)
+#if defined(CYF_GP8)
+    constexpr int LayerStacks = 9;
+#else
+    constexpr int LayerStacks = 5;
+    constexpr double kGpStackBounds[LayerStacks - 1] = {0.4, 0.6, 0.8, 1.0};
+#endif 
+
+    #define NNUE_SFNN_HAND_BUCKETS 1
+    #define NNUE_SFNN_HAND_BUCKET_TYPE 0
+    #define NNUE_SFNN_KING_BUCKETS 1
+    #define NNUE_SFNN_KING_BUCKET_TYPE 0
+    #define NNUE_SFNN_PROGRESS_BUCKETS 1
+#if defined(CYF_GP8)
+    #define NNUE_SFNN_GP_BUCKETS 9   
+#else
+    #define NNUE_SFNN_GP_BUCKETS 5
+#endif 
+#else
     constexpr int LayerStacks = 9;
 
     #define NNUE_SFNN_HAND_BUCKETS 1
@@ -33,19 +52,23 @@ namespace Eval::NNUE {
     #define NNUE_SFNN_KING_BUCKETS 9
     #define NNUE_SFNN_KING_BUCKET_TYPE 1
     #define NNUE_SFNN_PROGRESS_BUCKETS 1
+#endif
 
-    // Number of groups for the first affine layer of SFNN.
-    // common+shard fc_0でのみ2以上になる。
     constexpr IndexType kHidden1GroupCount = 1;
 
-    // common+shard fc_0 settings. kHidden1ShardDimensions is per shard.
     constexpr bool kHidden1UsesCommonShard = false;
     constexpr IndexType kHidden1CommonDimensions = 0;
     constexpr IndexType kHidden1ShardDimensions = 0;
 
-    // 各層の次元数
     constexpr IndexType kInputDims   = kTransformedFeatureDimensions;
+#if defined(CYF_GP8)
+#if !defined(CYF_H1)
+#define CYF_H1 7
+#endif
+    constexpr IndexType kHidden1Dims = CYF_H1;
+#else
     constexpr IndexType kHidden1Dims = 7;
+#endif 
     constexpr bool kUseShortcut = true;
     constexpr IndexType kHidden1OutputDims = kHidden1Dims + (kUseShortcut ? 1 : 0);
     constexpr IndexType kHidden2Dims = 64;                              
@@ -57,11 +80,20 @@ namespace Eval::NNUE {
 
     struct Network : NetworkBase {
         static std::string GetStructureString() {
+#if defined(CYFAMATE_NNUE_5GP)
+#if defined(CYF_GP8)
+            return "SFNN_HALFKA2_" + std::to_string(kTransformedFeatureDimensions) + "_"
+                 + std::to_string(kHidden1Dims) + "_" + std::to_string(kHidden2Dims);
+#else
+            return "SFNN_HALFKA2_1024_7_64_5GP";
+#endif 
+#else
             return "SFNN_HALFKA2_1024_7_64_K3K3";
+#endif
         }
     };
 
-}  // namespace Eval::NNUE
-}  // namespace YaneuraOu
+}  
+}  
 
-#endif // CLASSIC_NNUE_SFNN_HALFKA2_1024_7_64_K3K3_H_INCLUDED
+#endif 

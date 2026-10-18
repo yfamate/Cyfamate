@@ -3,15 +3,12 @@
 #include <cmath>
 #include <cstdint>
 
-// Ported from pyfamate/Pyfamate.py _compute_sharpness / _sharpness_combine (see source/cyfamate/PYFAMATE_PORTS.md).
-// Native four-axis proxy. I/T use policy p_max, not DL score spread/top-2 gap.
-// Main-thread state only; no model request, wait, or search is performed here.
 namespace CyfSharp {
 struct Observation {
     double instability = .5, tightness = .5, closeness = .5, disagree = .5, scalar = .5;
     double policy_max = -1;
     int cp = 0;
-    unsigned valid = 0; // I=1, T=2, C=4, D=8; a missing axis is not measured neutral.
+    unsigned valid = 0; 
 };
 inline double sigmoid(double cp, double scale) { return 1.0 / (1.0 + std::exp(-cp / scale)); }
 inline Observation observe(int cp, bool cp_ok, bool dl_ok, double policy_max, bool agree) {
@@ -48,4 +45,4 @@ struct State {
     bool policy_current() const { return gen != 0 && policy_gen == gen && policy_key == key; }
 };
 inline State& state() { static State s; return s; }
-} // namespace CyfSharp
+} 

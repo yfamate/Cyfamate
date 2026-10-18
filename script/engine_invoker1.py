@@ -7,7 +7,6 @@ import math
 def write_engine_file(num , engine_name , eval_dir , byoyomi , hash):
 	f = open("engine-config"+str(num)+".txt","w")
 	f.write(engine_name+"\n")
-#	f.write("go btime 0 wtime 0 byoyomi "+byoyomi+"\n")
 	f.write("go rtime " + byoyomi + "\n")
 	f.write("setoption name EvalDir value " + eval_dir+"\n")
 	f.write("setoption name Hash value " + str(hash) + "\n")
@@ -36,10 +35,7 @@ def output_rating(win,draw,lose):
 
 param = sys.argv
 
-# args format
-# 	HOMEPATH engine1 evaldir1 engine2 evaldir2 threads loop numa { rtime1 ... rtimeN }
 
-# loop for invoker
 
 home = param[1]
 if not (home.endswith('/') or home.endswith('\\')):
@@ -56,7 +52,6 @@ else:
 	for i in range (10,len(param)-1):
 		byoyomi_list.append(param[i])
 
-# expand eval_dir
 
 evaldirs = []
 if not os.path.exists(home + param[5] + "/0") :
@@ -89,19 +84,15 @@ for evaldir in evaldirs:
 
 		cmd = home + "\\exe\\local-game-serverV350.exe , booksfenfile " + home + "book/records1.sfen , threads " + threads + " , enginenuma " + numa + " , go btime " + loop + " wtime " + str(book_moves) + ", quit"
 
-		# subprocess.call( cmd.strip().split(" "))
 		print cmd
 		proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-		# stdout_data, stderr_data = p.communicate()
-		# print "finish: \n%s\n%s" % (stdout_data, stderr_data)
 
 		win = lose = draw = 0
 
 		while True:
 			retcode = proc.poll()
 			if retcode is not None:
-				# Process finished.
 				break
 
 			lines = proc.stdout.readline
@@ -121,16 +112,13 @@ for evaldir in evaldirs:
 				if update and (total % 10)==0 :
 					output_rating(win,draw,lose)
 
-#				print "[" +line +"]"
 
 				if "Error" in line:
 					print line
 					sys.stdout.flush()
 
-			# process is not done, wait a bit and check again.
 	        time.sleep(10)
 
-		# output final result
 		print "\n\nfinal result : "
 		print "engine1 = " + param[2] + " , eval = " + param[3]
 		print "engine2 = " + param[4] + " , eval = " + evaldir

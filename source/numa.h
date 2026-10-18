@@ -1,4 +1,4 @@
-﻿/*
+/*
   Stockfish, a UCI chess playing engine derived from Glaurung 2.1
   Copyright (C) 2004-2024 The Stockfish developers (see AUTHORS file)
 
@@ -40,8 +40,8 @@
 
 #include "shm.h"
 
-// We support linux very well, but we explicitly do NOT support Android,
-// because there is no affected systems, not worth maintaining.
+
+
 #if defined(__linux__) && !defined(__ANDROID__)
     #if !defined(_GNU_SOURCE)
         #define _GNU_SOURCE
@@ -51,11 +51,11 @@
 
     #if _WIN32_WINNT < 0x0601
         #undef _WIN32_WINNT
-        #define _WIN32_WINNT 0x0601  // Force to include needed API prototypes
+        #define _WIN32_WINNT 0x0601  
     #endif
 
-// On Windows each processor group can have up to 64 processors.
-// https://learn.microsoft.com/en-us/windows/win32/procthread/processor-groups
+
+
 static constexpr size_t WIN_PROCESSOR_GROUP_SIZE = 64;
 
     #if !defined(NOMINMAX)
@@ -66,10 +66,10 @@ static constexpr size_t WIN_PROCESSOR_GROUP_SIZE = 64;
         #undef small
     #endif
 
-// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setthreadselectedcpusetmasks
+
 using SetThreadSelectedCpuSetMasks_t = BOOL (*)(HANDLE, PGROUP_AFFINITY, USHORT);
 
-// https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getthreadselectedcpusetmasks
+
 using GetThreadSelectedCpuSetMasks_t = BOOL (*)(HANDLE, PGROUP_AFFINITY, USHORT, PUSHORT);
 
 #endif
@@ -81,17 +81,17 @@ namespace YaneuraOu {
 using CpuIndex  = size_t;
 using NumaIndex = size_t;
 
-// NUMAも考慮して、このPCで使えるスレッド数を返す。
+
 inline CpuIndex get_hardware_concurrency() {
     CpuIndex concurrency = std::thread::hardware_concurrency();
 
-    // Get all processors across all processor groups on windows, since
-    // hardware_concurrency() only returns the number of processors in
-    // the first group, because only these are available to std::thread.
+    
+    
+    
 
-	// Windowsで全てのプロセッサグループにまたがる全プロセッサを取得する。
-	// なぜなら、hardware_concurrency() は最初のグループ内のプロセッサ数しか返さない。
-	// これは std::thread で使用できるのがこのグループのプロセッサのみだからである。
+	
+	
+	
 
 #ifdef _WIN64
     concurrency = std::max<CpuIndex>(concurrency, GetActiveProcessorCount(ALL_PROCESSOR_GROUPS));
@@ -108,14 +108,14 @@ struct WindowsAffinity {
     std::optional<std::set<CpuIndex>> oldApi;
     std::optional<std::set<CpuIndex>> newApi;
 
-    // We also provide diagnostic for when the affinity is set to nullopt
-    // whether it was due to being indeterminate. If affinity is indeterminate
-    // it is best to assume it is not set at all, so consistent with the meaning
-    // of the nullopt affinity.
+    
+    
+    
+    
 
-	// アフィニティが nullopt に設定された場合、その原因が不定であったかどうかの診断も提供します。
-	// アフィニティが不定である場合、アフィニティが全く設定されていないと仮定するのが最善です。
-	// これは、nullopt のアフィニティの意味と一貫性があります。
+	
+	
+	
 
 	bool isNewDeterminate = true;
     bool isOldDeterminate = true;
@@ -132,41 +132,41 @@ struct WindowsAffinity {
         return intersect;
     }
 
-    // Since Windows 11 and Windows Server 2022 thread affinities can span
-    // processor groups and can be set as such by a new WinAPI function. However,
-    // we may need to force using the old API if we detect that the process has
-    // affinity set by the old API already and we want to override that. Due to the
-    // limitations of the old API we cannot detect its use reliably. There will be
-    // cases where we detect not use but it has actually been used and vice versa.
+    
+    
+    
+    
+    
+    
 
-	// Windows 11およびWindows Server 2022以降、スレッドのアフィニティはプロセッサグループをまたいで設定でき、
-	// 新しいWinAPI関数でそのように設定可能です。しかし、既に古いAPIでアフィニティが設定されている場合、
-	// それを上書きしたい場合には古いAPIを強制的に使用する必要があるかもしれません。
-	// ただし、古いAPIの制限により、その使用を確実に検出することはできません。
-	// 実際には使用されているのに検出できなかったり、逆に検出されたが実際には使用されていない場合が発生します。
+	
+	
+	
+	
+	
 
     bool likely_used_old_api() const { return oldApi.has_value() || !isOldDeterminate; }
 };
 
 inline std::pair<BOOL, std::vector<USHORT>> get_process_group_affinity() {
 
-    // GetProcessGroupAffinity requires the GroupArray argument to be
-    // aligned to 4 bytes instead of just 2.
+    
+    
 
-	// GetProcessGroupAffinity は、GroupArray 引数を2バイトではなく、
-	// 4バイトにアライメントさせる必要があります。
+	
+	
 
 	static constexpr size_t GroupArrayMinimumAlignment = 4;
     static_assert(GroupArrayMinimumAlignment >= alignof(USHORT));
 
-    // The function should succeed the second time, but it may fail if the group
-    // affinity has changed between GetProcessGroupAffinity calls. In such case
-    // we consider this a hard error, as we Cannot work with unstable affinities
-    // anyway.
+    
+    
+    
+    
 
-	// この関数は2回目には成功するはずですが、GetProcessGroupAffinityの呼び出し間で
-	// グループアフィニティが変更された場合、失敗する可能性があります。
-	// その場合、これを重大なエラーと見なし、不安定なアフィニティでは動作できないためです。
+	
+	
+	
 
 	static constexpr int MAX_TRIES  = 2;
     USHORT               GroupCount = 1;
@@ -195,27 +195,27 @@ inline std::pair<BOOL, std::vector<USHORT>> get_process_group_affinity() {
     return std::make_pair(0, std::vector<USHORT>());
 }
 
-// On Windows there are two ways to set affinity, and therefore 2 ways to get it.
-// These are not consistent, so we have to check both. In some cases it is actually
-// not possible to determine affinity. For example when two different threads have
-// affinity on different processor groups, set using SetThreadAffinityMask, we cannot
-// retrieve the actual affinities.
-// From documentation on GetProcessAffinityMask:
-//     > If the calling process contains threads in multiple groups,
-//     > the function returns zero for both affinity masks.
-// In such cases we just give up and assume we have affinity for all processors.
-// nullopt means no affinity is set, that is, all processors are allowed
 
-// Windowsでは、アフィニティを設定する方法が2つあり、それに応じて取得する方法も2つあります。
-// これらは一貫性がないため、両方を確認する必要があります。
-// 場合によっては、アフィニティを特定することが実際に不可能なことがあります。
-// 例えば、異なるスレッドが異なるプロセッサグループに対してSetThreadAffinityMaskを使って
-// アフィニティを設定している場合、実際のアフィニティを取得できません。
-// GetProcessAffinityMask のドキュメントには以下のように記載されています:
-//     > 呼び出し元プロセスが複数のグループにスレッドを含んでいる場合、
-//     > 関数は両方のアフィニティマスクに対してゼロを返します。
-// こうした場合、すべてのプロセッサに対してアフィニティがあると仮定し、諦めます。
-// nullopt はアフィニティが設定されていないことを意味し、つまりすべてのプロセッサが許可されていることを示します。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 inline WindowsAffinity get_process_affinity() {
     HMODULE k32                            = GetModuleHandle(TEXT("Kernel32.dll"));
@@ -231,11 +231,11 @@ inline WindowsAffinity get_process_affinity() {
         USHORT RequiredMaskCount;
         status = GetThreadSelectedCpuSetMasks_f(GetCurrentThread(), nullptr, 0, &RequiredMaskCount);
 
-        // We expect ERROR_INSUFFICIENT_BUFFER from GetThreadSelectedCpuSetMasks,
-        // but other failure is an actual error.
+        
+        
 
-		// GetThreadSelectedCpuSetMasks からは ERROR_INSUFFICIENT_BUFFER を予期していますが、
-		// それ以外の失敗は実際のエラーです。
+		
+		
 
 		if (status == 0 && GetLastError() != ERROR_INSUFFICIENT_BUFFER)
         {
@@ -243,11 +243,11 @@ inline WindowsAffinity get_process_affinity() {
         }
         else if (RequiredMaskCount > 0)
         {
-            // If RequiredMaskCount then these affinities were never set, but it's
-            // not consistent so GetProcessAffinityMask may still return some affinity.
+            
+            
 
-			// RequiredMaskCount が非ゼロの場合、これらのアフィニティは設定されていなかったことを示しますが、
-			// 一貫性がないため、GetProcessAffinityMask がいまだに何らかのアフィニティを返すことがあります。
+			
+			
 
 			auto groupAffinities = std::make_unique<GROUP_AFFINITY[]>(RequiredMaskCount);
 
@@ -278,29 +278,29 @@ inline WindowsAffinity get_process_affinity() {
         }
     }
 
-    // NOTE: There is no way to determine full affinity using the old API if
-    //       individual threads set affinity on different processor groups.
+    
+    
 
-	// 注意: 古いAPIでは、各スレッドが異なるプロセッサグループにアフィニティを設定している場合、
-	//       完全なアフィニティを特定する方法はありません。
+	
+	
 
     DWORD_PTR proc, sys;
     status = GetProcessAffinityMask(GetCurrentProcess(), &proc, &sys);
 
-    // If proc == 0 then we cannot determine affinity because it spans processor groups.
-    // On Windows 11 and Server 2022 it will instead
-    //     > If, however, hHandle specifies a handle to the current process, the function
-    //     > always uses the calling thread's primary group (which by default is the same
-    //     > as the process' primary group) in order to set the
-    //     > lpProcessAffinityMask and lpSystemAffinityMask.
-    // So it will never be indeterminate here. We can only make assumptions later.
+    
+    
+    
+    
+    
+    
+    
 
-	// proc が 0 の場合、アフィニティがプロセッサグループをまたがっているため、アフィニティを特定できません。
-	// Windows 11 と Server 2022では、代わりに次のように動作します:
-	//     > ただし、hHandle が現在のプロセスのハンドルを指定している場合、
-	//     > 関数は常に呼び出し元スレッドのプライマリグループ（デフォルトではプロセスのプライマリグループと同じ）
-	//     > を使用して、lpProcessAffinityMask と lpSystemAffinityMask を設定します。
-	// したがって、この場合アフィニティが不定になることはありません。この後は仮定に基づいて動作します。
+	
+	
+	
+	
+	
+	
 
 	if (status == 0 || proc == 0)
     {
@@ -308,18 +308,18 @@ inline WindowsAffinity get_process_affinity() {
         return affinity;
     }
 
-    // If SetProcessAffinityMask was never called the affinity must span
-    // all processor groups, but if it was called it must only span one.
+    
+    
 
-	// SetProcessAffinityMask が一度も呼ばれていない場合、アフィニティはすべてのプロセッサグループに
-	// またがっているはずです。しかし、呼ばれていた場合は、1つのグループにのみ限定されているはずです。
+	
+	
 
     std::vector<USHORT> groupAffinity;
 
-	// We need to capture this later and capturing
-    // from structured bindings requires c++20.
+	
+    
 
-	// これを後でキャプチャする必要があり、構造化束縛からのキャプチャにはC++20が必要です。
+	
 
     std::tie(status, groupAffinity) = get_process_group_affinity();
     if (status == 0)
@@ -330,11 +330,11 @@ inline WindowsAffinity get_process_affinity() {
 
     if (groupAffinity.size() == 1)
     {
-        // We detect the case when affinity is set to all processors and correctly
-        // leave affinity.oldApi as nullopt.
+        
+        
 
-		// アフィニティがすべてのプロセッサに設定されている場合を検出し、
-		// 正しく affinity.oldApi を nullopt のままにします。
+		
+		
 
         if (GetActiveProcessorGroupCount() != 1 || proc != sys)
         {
@@ -354,26 +354,26 @@ inline WindowsAffinity get_process_affinity() {
     }
     else
     {
-        // If we got here it means that either SetProcessAffinityMask was never set
-        // or we're on Windows 11/Server 2022.
+        
+        
 
-        // Since Windows 11 and Windows Server 2022 the behaviour of
-        // GetProcessAffinityMask changed:
-        //     > If, however, hHandle specifies a handle to the current process,
-        //     > the function always uses the calling thread's primary group
-        //     > (which by default is the same as the process' primary group)
-        //     > in order to set the lpProcessAffinityMask and lpSystemAffinityMask.
-        // In which case we can actually retrieve the full affinity.
+        
+        
+        
+        
+        
+        
+        
 
-		// ここに到達したということは、SetProcessAffinityMask が一度も設定されていないか、
-		// Windows 11/Server 2022 上で動作しているということです。
+		
+		
 
-		// Windows 11 および Windows Server 2022 以降、GetProcessAffinityMask の動作が変更されました:
-		//     > ただし、hHandle が現在のプロセスのハンドルを指定している場合、
-		//     > 関数は常に呼び出し元スレッドのプライマリグループ
-		//     > （デフォルトではプロセスのプライマリグループと同じ）を使用して
-		//     > lpProcessAffinityMask および lpSystemAffinityMask を設定します。
-		// この場合、実際に全てのアフィニティを取得できます。
+		
+		
+		
+		
+		
+		
 
         if (GetThreadSelectedCpuSetMasks_f != nullptr)
         {
@@ -386,15 +386,15 @@ inline WindowsAffinity get_process_affinity() {
                     const int numActiveProcessors =
                       GetActiveProcessorCount(static_cast<WORD>(procGroupIndex));
 
-                    // We have to schedule to two different processors
-                    // and & the affinities we get. Otherwise our processor
-                    // choice could influence the resulting affinity.
-                    // We assume the processor IDs within the group are
-                    // filled sequentially from 0.
+                    
+                    
+                    
+                    
+                    
 
-					// 2つの異なるプロセッサにスケジューリングし、取得したアフィニティを AND 演算する必要があります。
-					// そうしないと、プロセッサの選択が結果のアフィニティに影響を与える可能性があります。
-					// 同じグループ内のプロセッサIDは0から順に埋められていると仮定しています。
+					
+					
+					
 
 					uint64_t procCombined = std::numeric_limits<uint64_t>::max();
                     uint64_t sysCombined  = std::numeric_limits<uint64_t>::max();
@@ -439,12 +439,12 @@ inline WindowsAffinity get_process_affinity() {
                     }
                 }
 
-                // We have to detect the case where the affinity was not set,
-                // or is set to all processors so that we correctly produce as
-                // std::nullopt result.
+                
+                
+                
 
-				// アフィニティが設定されていない場合や、すべてのプロセッサに設定されている場合を検出し、
-				// 正しく std::nullopt の結果を生成する必要があります。
+				
+				
 
 				if (!isAffinityFull)
                 {
@@ -459,7 +459,7 @@ inline WindowsAffinity get_process_affinity() {
     return affinity;
 }
 
-// Type machinery used to emulate Cache->GroupCount
+
 
 template<typename T, typename = void>
 struct HasGroupCount: std::false_type {};
@@ -471,7 +471,7 @@ struct HasGroupCount<T, std::void_t<decltype(std::declval<T>().Cache.GroupCount)
 template<typename T, typename Pred, std::enable_if_t<HasGroupCount<T>::value, bool> = true>
 std::set<CpuIndex> readCacheMembers(const T* info, Pred&& is_cpu_allowed) {
     std::set<CpuIndex> cpus;
-    // On Windows 10 this will read a 0 because GroupCount doesn't exist
+    
     int groupCount = std::max(info->Cache.GroupCount, WORD(1));
     for (WORD procGroup = 0; procGroup < groupCount; ++procGroup)
     {
@@ -511,24 +511,24 @@ inline std::set<CpuIndex> get_process_affinity() {
 
     std::set<CpuIndex> cpus;
 
-    // For unsupported systems, or in case of a soft error, we may assume
-    // all processors are available for use.
+    
+    
 
-	// サポートされていないシステムや軽微なエラーの場合、
-	// すべてのプロセッサが使用可能であると仮定することがあります。
+	
+	
 
     [[maybe_unused]] auto set_to_all_cpus = [&]() {
         for (CpuIndex c = 0; c < SYSTEM_THREADS_NB; ++c)
             cpus.insert(c);
     };
 
-    // cpu_set_t by default holds 1024 entries. This may not be enough soon,
-    // but there is no easy way to determine how many threads there actually
-    // is. In this case we just choose a reasonable upper bound.
+    
+    
+    
 
-	// cpu_set_t はデフォルトで1024エントリを保持します。これは近い将来十分でない可能性がありますが、
-	// 実際にいくつのスレッドがあるかを簡単に特定する方法はありません。
-	// この場合、合理的な上限を選択します。
+	
+	
+	
 
     static constexpr CpuIndex MaxNumCpus = 1024 * 64;
 
@@ -571,13 +571,13 @@ inline static const auto STARTUP_USE_OLD_AFFINITY_API =
 
 #endif
 
-// We want to abstract the purpose of storing the numa node index somewhat.
-// Whoever is using this does not need to know the specifics of the replication
-// machinery to be able to access NUMA replicated memory.
 
-// NUMAノードのインデックスを保存する目的をある程度抽象化したいと考えています。
-// これを使用する人は、NUMAで複製されたメモリにアクセスするために、
-// 複製メカニズムの詳細を知る必要はありません。
+
+
+
+
+
+
 
 class NumaReplicatedAccessToken {
    public:
@@ -598,71 +598,71 @@ struct L3Domain {
     std::set<CpuIndex> cpus{};
 };
 
-// Use system NUMA nodes
+
 struct SystemNumaPolicy {};
-// Use system-reported L3 domains
+
 struct L3DomainsPolicy {};
-// Group system-reported L3 domains until they reach bundleSize
+
 struct BundledL3Policy {
     size_t bundleSize;
 };
 
 using NumaAutoPolicy = std::variant<SystemNumaPolicy, L3DomainsPolicy, BundledL3Policy>;
 
-// Designed as immutable, because there is no good reason to alter an already
-// existing config in a way that doesn't require recreating it completely, and
-// it would be complex and expensive to maintain class invariants.
-// The CPU (processor) numbers always correspond to the actual numbering used
-// by the system. The NUMA node numbers MAY NOT correspond to the system's
-// numbering of the NUMA nodes. In particular, by default, if the processor has
-// non-uniform cache access within a NUMA node (i.e., a non-unified L3 cache structure),
-// then L3 domains within a system NUMA node will be used to subdivide it
-// into multiple logical NUMA nodes in the config. Additionally, empty nodes may
-// be removed, or the user may create custom nodes.
-//
-// As a special case, when performing system-wide replication of read-only data
-// (i.e., LazyNumaReplicatedSystemWide), the system NUMA node is used, rather than
-// custom or L3-aware nodes. See that class's get_discriminator() function.
-//
-// It is guaranteed that NUMA nodes are NOT empty: every node exposed by NumaConfig
-// has at least one processor assigned.
-//
-// We use startup affinities so as not to modify its own behaviour in time.
-//
-// Since Stockfish doesn't support exceptions all places where an exception
-// should be thrown are replaced by std::exit.
 
-// 本設計はイミュータブル（不変）として設計されています。
-// すでに存在する設定を、完全に作り直さずに変更する合理的な理由がなく、
-// そのような変更を許すとクラスの不変条件を維持するのが
-// 複雑かつ高コストになるためです。
-//
-// CPU（プロセッサ）の番号は、常にシステムで実際に使用されている番号に対応します。
-// 一方で、NUMA ノードの番号は、システム上の NUMA ノード番号と
-// 一致しない場合があります。
-// 特に、プロセッサが NUMA ノード内で非一様なキャッシュアクセス
-//（すなわち L3 キャッシュが統合されていない構造）を持つ場合には、
-// デフォルトで、システム NUMA ノード内の L3 ドメインを用いて、
-// 設定上ではそれを複数の論理 NUMA ノードに分割します。
-// また、空のノードが削除されることや、
-// ユーザーがカスタムノードを作成することもあります。
-//
-// 特殊なケースとして、読み取り専用データをシステム全体で
-// レプリケーションする場合
-//（すなわち LazyNumaReplicatedSystemWide の場合）には、
-// カスタムノードや L3 を考慮したノードではなく、
-// システムの NUMA ノードが使用されます。
-// 詳細については、そのクラスの get_discriminator() 関数を参照してください。
-//
-// NUMA ノードが空になることはありません。
-// NumaConfig によって公開されるすべてのノードには、
-// 少なくとも 1 つのプロセッサが割り当てられていることが保証されています。
-//
-// 実行中に自身の挙動を変更しないようにするため、
-// 起動時のアフィニティを使用しています。
-//
-// Stockfish は例外をサポートしていないため、
-// 本来であれば例外を送出すべき箇所は、すべて std::exit に置き換えられています。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class NumaConfig {
    public:
@@ -673,18 +673,18 @@ class NumaConfig {
         add_cpu_range_to_node(NumaIndex{0}, CpuIndex{0}, numCpus - 1);
     }
 
-	// This function gets a NumaConfig based on the system's provided information.
-    // The available policies are documented above.
+	
+    
 
-	// この関数は、システムから提供される情報に基づいて NumaConfig を取得します。
-	// 利用可能なポリシーについては、上記に記載されています。
+	
+	
 
     static NumaConfig from_system([[maybe_unused]] const NumaAutoPolicy& policy,
                                   bool respectProcessAffinity = true) {
         NumaConfig cfg = empty();
 
 #if !((defined(__linux__) && !defined(__ANDROID__)) || defined(_WIN64))
-        // Fallback for unsupported systems.
+        
         for (CpuIndex c = 0; c < SYSTEM_THREADS_NB; ++c)
             cfg.add_cpu_to_node(NumaIndex{0}, c);
 #else
@@ -696,14 +696,14 @@ class NumaConfig {
         if (respectProcessAffinity)
             allowedCpus = STARTUP_PROCESSOR_AFFINITY.get_combined();
 
-        // The affinity cannot be determined in all cases on Windows,
-        // but we at least guarantee that the number of allowed processors
-        // is >= number of processors in the affinity mask. In case the user
-        // is not satisfied they must set the processor numbers explicitly.
+        
+        
+        
+        
 
-		// Windowsでは、すべてのケースでアフィニティを特定できるわけではありませんが、
-		// 少なくとも許可されたプロセッサの数がアフィニティマスク内のプロセッサ数以上であることは保証します。
-		// ユーザーが満足しない場合、プロセッサ番号を明示的に設定する必要があります。
+		
+		
+		
 
 		auto is_cpu_allowed = [&allowedCpus](CpuIndex c) {
             return !allowedCpus.has_value() || allowedCpus->count(c) == 1;
@@ -742,48 +742,48 @@ class NumaConfig {
 
     #if defined(_WIN64)
 
-        // Split the NUMA nodes to be contained within a group if necessary.
-        // This is needed between Windows 10 Build 20348 and Windows 11, because
-        // the new NUMA allocation behaviour was introduced while there was
-        // still no way to set thread affinity spanning multiple processor groups.
-        // See https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support
-        // We also do this is if need to force old API for some reason.
-        //
-        // 2024-08-26: It appears that we need to actually always force this behaviour.
-        // While Windows allows this to work now, such assignments have bad interaction
-        // with the scheduler - in particular it still prefers scheduling on the thread's
-        // "primary" node, even if it means scheduling SMT processors first.
-        // See https://github.com/official-stockfish/Stockfish/issues/5551
-        // See https://learn.microsoft.com/en-us/windows/win32/procthread/processor-groups
-        //
-        //     Each process is assigned a primary group at creation, and by default all
-        //     of its threads' primary group is the same. Each thread's ideal processor
-        //     is in the thread's primary group, so threads will preferentially be
-        //     scheduled to processors on their primary group, but they are able to
-        //     be scheduled to processors on any other group.
-        //
-        // used to be guarded by if (STARTUP_USE_OLD_AFFINITY_API)
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
-		// 必要に応じて、NUMAノードをグループ内に分割します。
-		// これは、Windows 10 Build 20348 から Windows 11 にかけて必要です。
-		// なぜなら、新しいNUMA割り当ての動作が導入されたものの、複数のプロセッサグループにまたがる
-		// スレッドのアフィニティを設定する方法がまだなかったためです。
-		// 詳細は https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support を参照してください。
-		// また、何らかの理由で古いAPIを強制的に使用する必要がある場合にもこの処理を行います。
-		//
-		// 2024-08-26: 実際には、この動作を常に強制する必要があるようです。
-		// Windowsでは現在この動作が許可されていますが、そのような割り当てはスケジューラとの相性が悪くなります。
-		// 特に、スレッドの「プライマリ」ノードでのスケジューリングが優先されるため、SMTプロセッサでの
-		// スケジューリングが優先されてしまうことがあります。
-		// 詳細は https://github.com/official-stockfish/Stockfish/issues/5551 および
-		// https://learn.microsoft.com/en-us/windows/win32/procthread/processor-groups を参照してください。
-		//
-		//     各プロセスは作成時にプライマリグループに割り当てられ、デフォルトではすべてのスレッドの
-		//     プライマリグループは同じです。各スレッドの理想的なプロセッサはそのスレッドの
-		//     プライマリグループ内にあり、スレッドはプライマリグループのプロセッサで優先的に
-		//     スケジュールされますが、他のグループのプロセッサにもスケジュールされることが可能です。
-		//
-		// 以前は、if (STARTUP_USE_OLD_AFFINITY_API) によってガードされていました。
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 
         {
             NumaConfig splitCfg = empty();
@@ -814,18 +814,18 @@ class NumaConfig {
 
 #endif
 
-        // We have to ensure no empty NUMA nodes persist.
-		// 空のNUMAノードが残らないようにする必要があります。
+        
+		
 
 		cfg.remove_empty_numa_nodes();
 
-        // If the user explicitly opts out from respecting the current process affinity
-        // then it may be inconsistent with the current affinity (obviously), so we
-        // consider it custom.
+        
+        
+        
 
-		// ユーザーが現在のプロセスアフィニティを無視することを明示的に選択した場合、
-		// それは現在のアフィニティと矛盾する可能性があります（当然のことですが）、
-		// したがってそれをカスタムとして扱います。
+		
+		
+		
 
 		if (!respectProcessAffinity)
             cfg.customAffinity = true;
@@ -833,15 +833,15 @@ class NumaConfig {
         return cfg;
     }
 
-    // ':'-separated numa nodes
-    // ','-separated cpu indices
-    // supports "first-last" range syntax for cpu indices
-    // For example "0-15,128-143:16-31,144-159:32-47,160-175:48-63,176-191"
+    
+    
+    
+    
 
-	// NUMAノードは ':' で区切り
-	// CPUインデックスは ',' で区切り
-	// CPUインデックスには "first-last" 形式の範囲指定がサポートされています
-	// 例えば "0-15,128-143:16-31,144-159:32-47,160-175:48-63,176-191"
+	
+	
+	
+	
 
 	static NumaConfig from_string(const std::string& s) {
         NumaConfig cfg = empty();
@@ -901,8 +901,8 @@ class NumaConfig {
                 auto next = std::next(it);
                 if (next == cpus.end() || *next != *it + 1)
                 {
-                    // cpus[i] is at the end of the range (may be of size 1)
-					// cpus[i] は範囲の末尾に位置しています（サイズが1の場合もあります）
+                    
+					
 
 					if (!isFirstSet)
                         str += ",";
@@ -932,36 +932,36 @@ class NumaConfig {
     }
 
     bool suggests_binding_threads(CpuIndex numThreads) const {
-        // If we can reasonably determine that the threads cannot be contained
-        // by the OS within the first NUMA node then we advise distributing
-        // and binding threads. When the threads are not bound we can only use
-        // NUMA memory replicated objects from the first node, so when the OS
-        // has to schedule on other nodes we lose performance. We also suggest
-        // binding if there's enough threads to distribute among nodes with minimal
-        // disparity. We try to ignore small nodes, in particular the empty ones.
+        
+        
+        
+        
+        
+        
+        
 
-        // If the affinity set by the user does not match the affinity given by
-        // the OS then binding is necessary to ensure the threads are running on
-        // correct processors.
+        
+        
+        
 
-		// スレッドが最初のNUMAノード内に収まらないと合理的に判断できる場合、
-		// スレッドを分散させ、バインドすることを推奨します。
-		// スレッドがバインドされていない場合、NUMAメモリ複製オブジェクトは最初のノードからのみ使用可能であり、
-		// OSが他のノードにスケジュールする必要がある場合、パフォーマンスが低下します。
-		// また、スレッドがノード間で最小限の不均衡で分散可能な場合にも、バインドを推奨します。
-		// 小さなノード、特に空のノードは無視するよう努めます。
+		
+		
+		
+		
+		
+		
 
-		// ユーザーが設定したアフィニティがOSによって提供されたアフィニティと一致しない場合、
-		// スレッドが正しいプロセッサ上で実行されることを保証するためにバインドが必要です。
+		
+		
 
 		if (customAffinity)
             return true;
 
-        // We obviously cannot distribute a single thread, so a single thread
-        // should never be bound.
+        
+        
 
-		// 明らかに1つのスレッドを分散させることはできないため、
-		// 単一のスレッドは決してバインドされるべきではありません。
+		
+		
 
 		if (numThreads <= 1)
             return false;
@@ -991,11 +991,11 @@ class NumaConfig {
 
         if (nodes.size() == 1)
         {
-            // Special case for when there's no NUMA nodes. This doesn't buy us
-            // much, but let's keep the default path simple.
+            
+            
 
-			// NUMAノードが存在しない場合の特別なケース。
-			// これ自体はあまりメリットがありませんが、デフォルトの処理をシンプルに保つために対応します。
+			
+			
 
 			ns.resize(numThreads, NumaIndex{0});
         }
@@ -1010,17 +1010,17 @@ class NumaConfig {
                 {
                     float fill =
                       static_cast<float>(occupation[n] + 1) / static_cast<float>(nodes[n].size());
-                    // NOTE: Do we want to perhaps fill the first available node
-                    //       up to 50% first before considering other nodes?
-                    //       Probably not, because it would interfere with running
-                    //       multiple instances. We basically shouldn't favor any
-                    //       particular node.
+                    
+                    
+                    
+                    
+                    
 
-					// 注意: 最初に使用可能なノードを、他のノードを考慮する前に
-					//       まず50％まで埋めるべきでしょうか？
-					//       多分そうすべきではありません。
-					//		 なぜなら、複数のインスタンスを実行する際に干渉してしまうためです。
-					//       基本的に、特定のノードを優先すべきではありません。
+					
+					
+					
+					
+					
 
 					if (fill < bestNodeFill)
                     {
@@ -1060,35 +1060,35 @@ class NumaConfig {
         if (status != 0)
             std::exit(EXIT_FAILURE);
 
-        // We yield this thread just to be sure it gets rescheduled.
-        // This is defensive, allowed because this code is not performance critical.
+        
+        
         sched_yield();
 
 #elif defined(_WIN64)
 
-        // Requires Windows 11. No good way to set thread affinity spanning
-        // processor groups before that.
+        
+        
 
-		// このスレッドが再スケジュールされることを確認するために、一旦このスレッドを譲ります。
-		// これは防御的な処理であり、このコードはパフォーマンスに関わる重要な部分ではないため許容されています。
+		
+		
 
 		HMODULE k32                            = GetModuleHandle(TEXT("Kernel32.dll"));
         auto    SetThreadSelectedCpuSetMasks_f = SetThreadSelectedCpuSetMasks_t(
           (void (*)()) GetProcAddress(k32, "SetThreadSelectedCpuSetMasks"));
 
-        // We ALWAYS set affinity with the new API if available, because
-        // there's no downsides, and we forcibly keep it consistent with
-        // the old API should we need to use it. I.e. we always keep this
-        // as a superset of what we set with SetThreadGroupAffinity.
+        
+        
+        
+        
 
-		// 新しいAPIが利用可能であれば、常にアフィニティを設定します。
-		// なぜなら、デメリットがなく、必要に応じて古いAPIとの一貫性を強制的に保つからです。
-		// つまり、SetThreadGroupAffinity で設定した内容を常にそのスーパーセットとして維持します。
+		
+		
+		
 
 		if (SetThreadSelectedCpuSetMasks_f != nullptr)
         {
-            // Only available on Windows 11 and Windows Server 2022 onwards
-			// Windows 11 および Windows Server 2022 以降でのみ利用可能
+            
+			
 
 			const USHORT numProcGroups = USHORT(
               ((highestCpuIndex + 1) + WIN_PROCESSOR_GROUP_SIZE - 1) / WIN_PROCESSOR_GROUP_SIZE);
@@ -1111,54 +1111,54 @@ class NumaConfig {
             if (status == 0)
                 std::exit(EXIT_FAILURE);
 
-            // We yield this thread just to be sure it gets rescheduled.
-            // This is defensive, allowed because this code is not performance critical.
+            
+            
 
-			// このスレッドが再スケジュールされることを確認するために、一旦このスレッドを譲ります。
-			// これは防御的な処理であり、このコードはパフォーマンスに関わる重要な部分ではないため許容されています。
+			
+			
 
 			SwitchToThread();
         }
 
-        // Sometimes we need to force the old API, but do not use it unless necessary.
-		// 古いAPIを強制的に使用する必要がある場合もありますが、必要でない限り使用しないようにします。
+        
+		
 
 		if (SetThreadSelectedCpuSetMasks_f == nullptr || STARTUP_USE_OLD_AFFINITY_API)
         {
-            // On earlier windows version (since windows 7) we cannot run a single thread
-            // on multiple processor groups, so we need to restrict the group.
-            // We assume the group of the first processor listed for this node.
-            // Processors from outside this group will not be assigned for this thread.
-            // Normally this won't be an issue because windows used to assign NUMA nodes
-            // such that they cannot span processor groups. However, since Windows 10
-            // Build 20348 the behaviour changed, so there's a small window of versions
-            // between this and Windows 11 that might exhibit problems with not all
-            // processors being utilized.
-            //
-            // We handle this in NumaConfig::from_system by manually splitting the
-            // nodes when we detect that there is no function to set affinity spanning
-            // processor nodes. This is required because otherwise our thread distribution
-            // code may produce suboptimal results.
-            //
-			// Windows 7以降の初期のWindowsバージョンでは、1つのスレッドを複数のプロセッサグループにまたがって
-			// 実行することができないため、グループを制限する必要があります。
-			// このノードにリストされている最初のプロセッサのグループを使用すると仮定します。
-			// このグループ外のプロセッサは、このスレッドには割り当てられません。
-			// 通常、これは問題にならないはずです。というのも、以前のWindowsではNUMAノードが
-			// プロセッサグループをまたがないように割り当てられていたからです。
-			// しかし、Windows 10 Build 20348以降、この動作が変更されたため、Windows 11までのバージョン間で
-			// すべてのプロセッサが利用されない問題が発生する可能性があります。
-			//
-			// この問題は、NumaConfig::from_system 内で、アフィニティをプロセッサノード間にまたがって設定する
-			// 関数がないことを検出した場合に、ノードを手動で分割することで対処しています。
-			// これは、そうしないとスレッド分散コードが最適でない結果を生む可能性があるため、必要な処理です。
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
 
-			// See https://learn.microsoft.com/en-us/windows/win32/procthread/numa-support
+			
             GROUP_AFFINITY affinity;
             std::memset(&affinity, 0, sizeof(GROUP_AFFINITY));
 
-			// We use an ordered set to be sure to get the smallest cpu number here.
-			// 最小のCPU番号を取得するために、順序付きセットを使用しています。
+			
+			
             const size_t forcedProcGroupIndex = *(nodes[n].begin()) / WIN_PROCESSOR_GROUP_SIZE;
             affinity.Group                    = static_cast<WORD>(forcedProcGroupIndex);
             for (CpuIndex c : nodes[n])
@@ -1166,13 +1166,13 @@ class NumaConfig {
                 const size_t procGroupIndex     = c / WIN_PROCESSOR_GROUP_SIZE;
                 const size_t idxWithinProcGroup = c % WIN_PROCESSOR_GROUP_SIZE;
 
-				// We skip processors that are not in the same processor group.
-                // If everything was set up correctly this will never be an issue,
-                // but we have to account for bad NUMA node specification.
+				
+                
+                
 
-				// 同じプロセッサグループに属していないプロセッサはスキップします。
-				// すべてが正しく設定されていれば問題にはなりませんが、不適切なNUMAノード指定が
-				// ある可能性も考慮する必要があります。
+				
+				
+				
 
 				if (procGroupIndex != forcedProcGroupIndex)
                     continue;
@@ -1186,11 +1186,11 @@ class NumaConfig {
             if (status == 0)
                 std::exit(EXIT_FAILURE);
 
-            // We yield this thread just to be sure it gets rescheduled. This is
-            // defensive, allowed because this code is not performance critical.
+            
+            
 
-			// このスレッドが再スケジュールされることを確認するために、一旦このスレッドを譲ります。
-			// これは防御的な処理であり、このコードはパフォーマンスに関わる重要な部分ではないため許容されています。
+			
+			
 
 			SwitchToThread();
         }
@@ -1234,13 +1234,13 @@ class NumaConfig {
         nodes = std::move(newNodes);
     }
 
-    // Returns true if successful
-    // Returns false if failed, i.e. when the cpu is already present
-    //                          strong guarantee, the structure remains unmodified
+    
+    
+    
 
-	// 成功した場合は true を返します。
-	// 失敗した場合、すなわち、すでにCPUが存在する場合は false を返します。
-	//                          強い保証: 構造は変更されません。
+	
+	
+	
 
 	bool add_cpu_to_node(NumaIndex n, CpuIndex c) {
         if (is_cpu_assigned(c))
@@ -1258,13 +1258,13 @@ class NumaConfig {
         return true;
     }
 
-    // Returns true if successful
-    // Returns false if failed, i.e. when any of the cpus is already present
-    //                          strong guarantee, the structure remains unmodified
+    
+    
+    
 
-	// 成功した場合は true を返します。
-	// 失敗した場合、すなわち、いずれかのCPUがすでに存在する場合は false を返します。
-	//							強い保証: 構造は変更されません。
+	
+	
+	
 
 	bool add_cpu_range_to_node(NumaIndex n, CpuIndex cfirst, CpuIndex clast) {
         for (CpuIndex c = cfirst; c <= clast; ++c)
@@ -1318,10 +1318,10 @@ class NumaConfig {
     }
 
 
-    // This function queries the system for the mapping of processors to NUMA nodes.
-    // On Linux we read from standardized kernel sysfs, with a fallback to single NUMA
-    // node. On Windows we utilize GetNumaProcessorNodeEx, which has its quirks, see
-    // comment for Windows implementation of get_process_affinity.
+    
+    
+    
+    
     template<typename Pred>
     static NumaConfig from_system_numa([[maybe_unused]] bool   respectProcessAffinity,
                                        [[maybe_unused]] Pred&& is_cpu_allowed) {
@@ -1329,10 +1329,10 @@ class NumaConfig {
 
 #if defined(__linux__) && !defined(__ANDROID__)
 
-        // On Linux things are straightforward, since there's no processor groups and
-        // any thread can be scheduled on all processors.
-        // We try to gather this information from the sysfs first
-        // https://www.kernel.org/doc/Documentation/ABI/stable/sysfs-devices-node
+        
+        
+        
+        
 
         bool useFallback = false;
         auto fallback    = [&]() {
@@ -1340,7 +1340,7 @@ class NumaConfig {
             cfg         = empty();
         };
 
-        // /sys/devices/system/node/online contains information about active NUMA nodes
+        
         auto nodeIdsStr = read_file_to_string("/sys/devices/system/node/online");
         if (!nodeIdsStr.has_value() || nodeIdsStr->empty())
         {
@@ -1351,13 +1351,13 @@ class NumaConfig {
             remove_whitespace(*nodeIdsStr);
             for (size_t n : indices_from_shortened_string(*nodeIdsStr))
             {
-                // /sys/devices/system/node/node.../cpulist
+                
                 std::string path =
                   std::string("/sys/devices/system/node/node") + std::to_string(n) + "/cpulist";
                 auto cpuIdsStr = read_file_to_string(path);
-                // Now, we only bail if the file does not exist. Some nodes may be
-                // empty, that's fine. An empty node still has a file that appears
-                // to have some whitespace, so we need to handle that.
+                
+                
+                
                 if (!cpuIdsStr.has_value())
                 {
                     fallback();
@@ -1408,7 +1408,7 @@ class NumaConfig {
 
 #else
 
-        abort();  // should not reach here
+        abort();  
 
 #endif
 
@@ -1418,8 +1418,8 @@ class NumaConfig {
     template<typename Pred>
     static std::optional<NumaConfig> try_get_l3_aware_config(
       bool respectProcessAffinity, size_t bundleSize, [[maybe_unused]] Pred&& is_cpu_allowed) {
-        // Get the normal system configuration so we know to which NUMA node
-        // each L3 domain belongs.
+        
+        
         NumaConfig systemConfig =
           NumaConfig::from_system(SystemNumaPolicy{}, respectProcessAffinity);
         std::vector<L3Domain> l3Domains;
@@ -1442,7 +1442,7 @@ class NumaConfig {
 
             if (!siblingsStr.has_value() || siblingsStr->empty())
             {
-                break;  // we have read all available CPUs
+                break;  
             }
 
             L3Domain domain;
@@ -1486,7 +1486,7 @@ class NumaConfig {
                     l3Domains.push_back(std::move(domain));
                 }
             }
-            // Variable length data structure, advance to next
+            
             info = reinterpret_cast<PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX>(
               reinterpret_cast<char*>(info) + info->Size);
         }
@@ -1511,8 +1511,8 @@ class NumaConfig {
         for (auto& [_, ds] : list)
         {
             bool changed;
-            // Scan through pairs and merge them. With roughly equal L3 sizes, should give
-            // a decent distribution.
+            
+            
             do
             {
                 changed = false;
@@ -1525,7 +1525,7 @@ class NumaConfig {
                         ds.erase(ds.begin() + j + 1);
                     }
                 }
-                // ds.size() has decreased if changed is true, so this loop will terminate
+                
             } while (changed);
             for (const L3Domain& d : ds)
             {
@@ -1542,11 +1542,11 @@ class NumaConfig {
 
 class NumaReplicationContext;
 
-// Instances of this class are tracked by the NumaReplicationContext instance.
-// NumaReplicationContext informs all tracked instances when NUMA configuration changes.
 
-// このクラスのインスタンスは NumaReplicationContext インスタンスによって追跡されます。
-// NumaReplicationContext は、NUMA構成が変更されたときに、追跡されたすべてのインスタンスに通知します。
+
+
+
+
 
 class NumaReplicatedBase {
    public:
@@ -1567,13 +1567,13 @@ class NumaReplicatedBase {
     NumaReplicationContext* context;
 };
 
-// We force boxing with a unique_ptr. If this becomes an issue due to added
-// indirection we may need to add an option for a custom boxing type. When the
-// NUMA config changes the value stored at the index 0 is replicated to other nodes.
 
-// unique_ptr を使用して強制的にボクシングします。もし追加の間接参照によって問題が生じる場合は、
-// カスタムボクシング型を追加するオプションが必要かもしれません。
-// NUMA構成が変更されると、インデックス0に格納された値が他のノードに複製されます。
+
+
+
+
+
+
 
 template<typename T>
 class NumaReplicated: public NumaReplicatedBase {
@@ -1628,11 +1628,11 @@ class NumaReplicated: public NumaReplicatedBase {
     }
 
     void on_numa_config_changed() override {
-        // Use the first one as the source. It doesn't matter which one we use,
-        // because they all must be identical, but the first one is guaranteed to exist.
+        
+        
 
-		// 最初のものをソースとして使用します。どれを使っても同一である必要があるため、どれを使用しても問題ありませんが、
-		// 最初のものは必ず存在することが保証されています。
+		
+		
 
 		auto source = std::move(instances[0]);
         replicate_from(std::move(*source));
@@ -1656,63 +1656,23 @@ class NumaReplicated: public NumaReplicatedBase {
         else
         {
             assert(cfg.num_numa_nodes() == 1);
-            // We take advantage of the fact that replication is not required
-            // and reuse the source value, avoiding one copy operation.
+            
+            
 
-			// 複製が不要であることを利用し、ソースの値を再利用してコピー操作を1回回避します。
+			
 
 			instances.emplace_back(std::make_unique<T>(std::move(source)));
         }
     }
 };
 
-// We force boxing with a unique_ptr. If this becomes an issue due to added
-// indirection we may need to add an option for a custom boxing type.
-
-// unique_ptrを使用して強制的にボクシングします。追加の間接参照によって問題が発生する場合は、
-// カスタムボクシング型のオプションを追加する必要があるかもしれません。
-
-/*
-	📝
-		「遅延複製（Lazy Replication）」とは、必要になるまで（遅延して）複製を行わず、
-		実際にそのNUMAノードからアクセスされたときに初めて複製するという意味。
-
-		そして「異なるNUMAノードのときだけ複製する」というのは、より具体的には：
-
-			1. 最初は1つだけインスタンスを作成：
-				NUMAノード0で T 型のインスタンスを生成（T は複製したいオブジェクト型）。
-
-				他のNUMAノード用にはまだインスタンスを生成しない（つまり nullptr のまま）。
-
-			2. アクセスされたNUMAノードのインデックスが 0 のとき：
-
-				既存の instances[0] をそのまま返す。
-
-			3. アクセスされたNUMAノードが 0 以外のとき：
-
-				そのインデックスの instances[n] が nullptr なら：
-				mutex をロックして（スレッド安全に）
-
-				instances[n] = std::make_unique<T>(*instances[0]); として複製を生成
-
-				そのNUMAノード上で std::make_unique<T> を呼び出すために cfg.execute_on_numa_node(n, ...) を使って、
-				該当ノードにスレッドを一時的にバインドして生成、既に存在していれば、そのまま返す
 
 
-		実際の使い方。
-				const LazyNumaReplicated<Eval::Evaluator>& networks;
-		のように評価関数をLazyNumaReplicatedでくるむ。
 
-		以下のようなコードで、実際にnumaにアクセスする。まだ複製が完了していないnumaであれば、
-		このときにパラメーターがそのnuma用に複製される。
 
-			void Search::Worker::ensure_network_replicated() {
-				// Access once to force lazy initialization.
-				// We do this because we want to avoid initialization during search.
-				(void) (networks[numaAccessToken]);
-			}
 
-*/
+
+
 
 template<typename T>
 class LazyNumaReplicated: public NumaReplicatedBase {
@@ -1769,11 +1729,11 @@ class LazyNumaReplicated: public NumaReplicatedBase {
 
     void on_numa_config_changed() override {
 
-		// Use the first one as the source. It doesn't matter which one we use,
-        // because they all must be identical, but the first one is guaranteed to exist.
+		
+        
 
-		// 最初のものをソースとして使用します。どれを使ってもすべて同一である必要があるため、
-		// どれを使用しても問題ありませんが、最初のものは必ず存在することが保証されています。
+		
+		
 
 		auto source = std::move(instances[0]);
         prepare_replicate_from(std::move(*source));
@@ -1793,8 +1753,8 @@ class LazyNumaReplicated: public NumaReplicatedBase {
 
         std::unique_lock<std::mutex> lock(mutex);
 
-		// Check again for races.
-		// レースコンディションがないか再度確認します。
+		
+		
 
 		if (instances[idx] != nullptr)
             return;
@@ -1812,18 +1772,18 @@ class LazyNumaReplicated: public NumaReplicatedBase {
         {
             assert(cfg.num_numa_nodes() > 0);
 
-            // We just need to make sure the first instance is there.
-            // Note that we cannot move here as we need to reallocate the data
-            // on the correct NUMA node.
+            
+            
+            
 
-			// 最初のインスタンスが存在することを確認する必要があります。
-			// ここではデータを正しいNUMAノードに再割り当てする必要があるため、move操作はできません。
+			
+			
 
 			cfg.execute_on_numa_node(
               0, [this, &source]() { instances.emplace_back(std::make_unique<T>(source)); });
 
-            // Prepare others for lazy init.
-			// 他のインスタンスを遅延初期化に備えます。
+            
+			
 
 			instances.resize(cfg.num_numa_nodes());
         }
@@ -1831,18 +1791,18 @@ class LazyNumaReplicated: public NumaReplicatedBase {
         {
             assert(cfg.num_numa_nodes() == 1);
 
-			// We take advantage of the fact that replication is not required
-            // and reuse the source value, avoiding one copy operation.
+			
+            
 
-			// 複製が不要であることを利用して、ソース値を再利用し、コピー操作を1回回避します。
+			
 
 			instances.emplace_back(std::make_unique<T>(std::move(source)));
         }
     }
 };
 
-// Utilizes shared memory.
-// 共有メモリを利用します。
+
+
 template<typename T>
 class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
    public:
@@ -1911,8 +1871,8 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
     }
 
     void on_numa_config_changed() override {
-        // Use the first one as the source. It doesn't matter which one we use,
-        // because they all must be identical, but the first one is guaranteed to exist.
+        
+        
         auto source = std::make_unique<T>(*instances[0]);
         prepare_replicate_from(std::move(source));
     }
@@ -1924,8 +1884,8 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
     std::size_t get_discriminator(NumaIndex idx) const {
         const NumaConfig& cfg     = get_numa_config();
         const NumaConfig& cfg_sys = NumaConfig::from_system(SystemNumaPolicy{}, false);
-        // as a discriminator, locate the hardware/system numadomain this cpuindex belongs to
-        CpuIndex    cpu     = *cfg.nodes[idx].begin();  // get a CpuIndex from NumaIndex
+        
+        CpuIndex    cpu     = *cfg.nodes[idx].begin();  
         NumaIndex   sys_idx = cfg_sys.is_cpu_assigned(cpu) ? cfg_sys.nodeByCpu.at(cpu) : 0;
         std::string s       = cfg_sys.to_string() + "$" + std::to_string(sys_idx);
         return static_cast<std::size_t>(hash_string(s));
@@ -1940,7 +1900,7 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
         assert(idx != 0);
 
         std::unique_lock<std::mutex> lock(mutex);
-        // Check again for races.
+        
         if (instances[idx] != nullptr)
             return;
 
@@ -1954,10 +1914,10 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
         instances.clear();
 
         const NumaConfig& cfg = get_numa_config();
-        // We just need to make sure the first instance is there.
-        // Note that we cannot move here as we need to reallocate the data
-        // on the correct NUMA node.
-        // Even in the case of a single NUMA node we have to copy since it's shared memory.
+        
+        
+        
+        
         if (cfg.requires_memory_replication())
         {
             assert(cfg.num_numa_nodes() > 0);
@@ -1966,7 +1926,7 @@ class LazyNumaReplicatedSystemWide: public NumaReplicatedBase {
                 instances.emplace_back(SystemWideSharedConstant<T>(*source, get_discriminator(0)));
             });
 
-            // Prepare others for lazy init.
+            
             instances.resize(cfg.num_numa_nodes());
         }
         else
@@ -1990,8 +1950,8 @@ class NumaReplicationContext {
 
     ~NumaReplicationContext() {
 
-		// The context must outlive replicated objects
-		// コンテキストは複製されたオブジェクトよりも長く生存している必要があります。
+		
+		
 
 		if (!trackedReplicatedObjects.empty())
             std::exit(EXIT_FAILURE);
@@ -2007,8 +1967,8 @@ class NumaReplicationContext {
         trackedReplicatedObjects.erase(obj);
     }
 
-    // oldObj may be invalid at this point
-	// この時点で oldObj は無効になっている可能性があります。
+    
+	
 
 	void move_attached([[maybe_unused]] NumaReplicatedBase* oldObj, NumaReplicatedBase* newObj) {
         assert(trackedReplicatedObjects.count(oldObj) == 1);
@@ -2028,8 +1988,8 @@ class NumaReplicationContext {
    private:
     NumaConfig config;
 
-    // std::set uses std::less by default, which is required for pointer comparison
-	// std::set はデフォルトで std::less を使用しており、ポインタの比較にはこれが必要です。
+    
+	
 
 	std::set<NumaReplicatedBase*> trackedReplicatedObjects;
 };
@@ -2062,11 +2022,11 @@ inline const NumaConfig& NumaReplicatedBase::get_numa_config() const {
 }
 
 
-// 🌈 やねうら王ではThreadIds構造体でまとめて管理する。
+
 
 namespace Search {
 
-	// StockfishのWorker, Threadで渡している構造体。
+	
 	struct ThreadIds
 	{
 		size_t threadIdx;
@@ -2078,10 +2038,10 @@ namespace Search {
 	class Worker;
     struct SharedState;
 
-	// Worker派生classのfactory
+	
 	typedef std::function<LargePagePtr<Worker>(SharedState& sharedState, const ThreadIds& ids)> WorkerFactory;
 }
 
-} // namespace YaneuraOu
+} 
 
-#endif  // #ifndef NUMA_H_INCLUDED
+#endif  

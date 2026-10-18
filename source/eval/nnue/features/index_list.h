@@ -1,5 +1,3 @@
-﻿// Definition of index list of input features
-// 入力特徴量のインデックスリストの定義
 
 #ifndef CLASSIC_NNUE_FEATURES_INDEX_LIST_H_INCLUDED
 #define CLASSIC_NNUE_FEATURES_INDEX_LIST_H_INCLUDED
@@ -14,8 +12,6 @@
 namespace YaneuraOu {
 namespace Eval::NNUE::Features {
 
-// Class template used for feature index list
-// 特徴量のインデックスリストに使うクラステンプレート
 template <typename T, std::size_t MaxSize>
 class ValueList {
 
@@ -43,15 +39,13 @@ private:
 	std::size_t size_ = 0;
 };
 
-//Type of feature index list
-// 特徴量のインデックスリストの型
 class IndexList
 	: public ValueList<IndexType, RawFeatures::kMaxActiveDimensions> {
 };
 
-} // namespace Eval::NNUE::Features
-} // namespace YaneuraOu
+} 
+} 
 
-#endif  // defined(EVAL_NNUE)
+#endif  
 
-#endif // NNUE_FEATURES_INDEX_LIST_H_INCLUDED
+#endif 

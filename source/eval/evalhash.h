@@ -1,4 +1,4 @@
-﻿#ifndef EVALHASH_H_INCLUDED
+#ifndef EVALHASH_H_INCLUDED
 #define EVALHASH_H_INCLUDED
 
 #include "../types.h"
@@ -6,24 +6,19 @@
 
 namespace YaneuraOu {
 
-// シンプルなHashTableの実装。Sizeは2のべき乗。
-// 評価値のcacheに用いる。
 template <typename T>
 struct HashTable
 {
-	// 配列のresize。単位は[MB]
 	void resize(ThreadPool& threads, size_t mbSize)
 	{
 		size_t newClusterCount = mbSize * 1024 * 1024 / sizeof(T);
-		newClusterCount = (size_t)1 << MSB64(newClusterCount); // msbだけ取り、2**nであることを保証する
+		newClusterCount = (size_t)1 << MSB64(newClusterCount); 
 
 		if (newClusterCount != size)
 		{
 			release();
 			size = newClusterCount;
 
-			// ゼロクリアしておかないと、benchの結果が不安定になる。
-			// 気持ち悪いのでゼロクリアしておく。
 			entries_ = (T*)aligned_large_pages_alloc(size * sizeof(T));
 			clear(threads);
 		}
@@ -49,6 +44,6 @@ private:
 	T* entries_ = nullptr;
 };
 
-} // namespace YaneuraOu
+} 
 
-#endif // EVALHASH_H_INCLUDED
+#endif 

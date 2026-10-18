@@ -10,18 +10,8 @@ import argparse
 import platform
 import logging
 
-# python package install (Windows):
-# https://www.microsoft.com/store/productId/9P7QFQMJRFP7
-# python3 -m pip install cpuid pandas pexpect pyyaml statsmodels numpy==1.19.3
 
-# python package install (Ubuntu):
-# sudo apt-get update
-# sudo apt-get install python3 python3-pip
-# python3 -m pip install cpuid pandas pexpect pyyaml statsmodels numpy
 
-# python package list:
-# python3 -m pip list
-# python3 -m pip list --outdated
 
 pandas.options.display.float_format = '{:11.0f}'.format
 

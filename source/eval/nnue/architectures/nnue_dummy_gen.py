@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# Generate a dummy nn.bin for an NNUE/SFNN architecture.
 
 import argparse
 import os

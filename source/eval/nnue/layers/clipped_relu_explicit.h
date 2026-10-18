@@ -1,5 +1,3 @@
-// Definition of layer ClippedReLUExplicit of NNUE evaluation function
-// 📝 このheaderはSFNNで使う新しい仕様のaffine_transform.h
 
 #ifndef NNUE_LAYERS_CLIPPED_RELU_EXPLICIT_H_INCLUDED
 #define NNUE_LAYERS_CLIPPED_RELU_EXPLICIT_H_INCLUDED
@@ -13,7 +11,6 @@
 namespace YaneuraOu {
 namespace Eval::NNUE::Layers {
 
-// Clipped ReLU (Explicit Dimensions)
 template <IndexType InputDimensions>
 class ClippedReLUExplicit {
  public:
@@ -117,7 +114,7 @@ class ClippedReLUExplicit {
           _mm_store_si128(&out[i],
   #if defined(USE_SSE41)
               _mm_max_epi8(packedbytes, kZero)
-  #else // SSE4非対応だがSSE3は使える環境
+  #else 
               _mm_subs_epi8(_mm_adds_epi8(packedbytes, k0x80s), k0x80s)
   #endif
           );
@@ -180,9 +177,9 @@ class ClippedReLUExplicit {
 
 };
 
-}  // namespace Eval::NNUE::Layers
-}  // namespace YaneuraOu
+}  
+}  
 
-#endif  // defined(EVAL_NNUE)
+#endif  
 
-#endif // NNUE_LAYERS_CLIPPED_RELU_EXPLICIT_H_INCLUDED
+#endif 

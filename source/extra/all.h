@@ -1,9 +1,6 @@
-﻿#ifndef __ALL_H_INCLUDED__
+#ifndef __ALL_H_INCLUDED__
 #define __ALL_H_INCLUDED__
 
-// すべてのheaderを読み込むheader
-// 実験時などで手っ取り早くすべてのheaderを読み込んでしまいたいときに使う。
-// (ビルドが遅くなるので最終的には使わないように)
 
 #include <sstream>
 #include <iostream>
@@ -24,7 +21,6 @@
 #include "../engine.h"
 #include "../movegen.h"
 
-// これもおまけしておく。
 using namespace std;
 
-#endif // ndef __ALL_H_INCLUDED__
+#endif 

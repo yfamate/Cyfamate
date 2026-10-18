@@ -1,5 +1,3 @@
-﻿// Definition of layer ClippedReLU of NNUE evaluation function
-// NNUE評価関数の層ClippedReLUの定義
 
 #ifndef CLASSIC_NNUE_LAYERS_CLIPPED_RELU_H_INCLUDED
 #define CLASSIC_NNUE_LAYERS_CLIPPED_RELU_H_INCLUDED
@@ -13,74 +11,55 @@
 namespace YaneuraOu {
 namespace Eval::NNUE::Layers {
 
-// Clipped ReLU
 template <typename PreviousLayer>
 class ClippedReLU {
  public:
-  // Input/output type
-  // 入出力の型
   using InputType = typename PreviousLayer::OutputType;
   using OutputType = std::uint8_t;
   static_assert(std::is_same<InputType, std::int32_t>::value, "");
 
-  // Number of input/output dimensions
-  // 入出力の次元数
   static constexpr IndexType kInputDimensions =
       PreviousLayer::kOutputDimensions;
   static constexpr IndexType kOutputDimensions = kInputDimensions;
   static constexpr IndexType kPaddedOutputDimensions =
       CeilToMultiple<IndexType>(kOutputDimensions, kMaxSimdWidth);
 
-  // Size of forward propagation buffer used in this layer
-  // この層で使用する順伝播用バッファのサイズ
   static constexpr std::size_t kSelfBufferSize =
       CeilToMultiple(kOutputDimensions * sizeof(OutputType), kCacheLineSize);
 
-  // Size of the forward propagation buffer used from the input layer to this layer
-  // 入力層からこの層までで使用する順伝播用バッファのサイズ
   static constexpr std::size_t kBufferSize =
       PreviousLayer::kBufferSize + kSelfBufferSize;
 
-  // Hash value embedded in the evaluation file
-  // 評価関数ファイルに埋め込むハッシュ値
   static constexpr std::uint32_t GetHashValue() {
     std::uint32_t hash_value = 0x538D24C7u;
     hash_value += PreviousLayer::GetHashValue();
     return hash_value;
   }
 
-  // ハッシュ値を前段の値から更新するときのヘルパー
   static constexpr std::uint32_t GetHashValue(std::uint32_t prevHash) {
     return 0x538D24C7u + prevHash;
   }
 
-  // 入力層からこの層までの構造を表す文字列
   static std::string GetStructureString() {
     return "ClippedReLU[" +
         std::to_string(kOutputDimensions) + "](" +
         PreviousLayer::GetStructureString() + ")";
   }
 
-  // Read network parameters
-  // パラメータを読み込む
   Tools::Result ReadParameters(std::istream& stream) {
     return previous_layer_.ReadParameters(stream);
   }
 
-  // パラメータを書き込む
   bool WriteParameters(std::ostream& stream) const {
     return previous_layer_.WriteParameters(stream);
   }
 
-  // Forward propagation
-  // 順伝播
   const OutputType* Propagate(
       const TransformedFeatureType* transformed_features, char* buffer) const {
     const auto input = previous_layer_.Propagate(
         transformed_features, buffer + kSelfBufferSize);
     const auto output = reinterpret_cast<OutputType*>(buffer);
 
-  // 端数が生じないように、適切なSIMD幅を選択する。
   #if defined(USE_AVX512)
     if constexpr (kInputDimensions % 64 == 0)
     {
@@ -150,7 +129,7 @@ class ClippedReLU {
           _mm_store_si128(&out[i],
   #if defined(USE_SSE41)
               _mm_max_epi8(packedbytes, kZero)
-  #else // SSE4非対応だがSSE3は使える環境
+  #else 
               _mm_subs_epi8(_mm_adds_epi8(packedbytes, k0x80s), k0x80s)
   #endif
           );
@@ -213,13 +192,12 @@ class ClippedReLU {
   }
 
  private:
-   // この層の直前の層
    PreviousLayer previous_layer_;
 };
 
-} // namespace Eval::NNUE::Layers
-} // namespace YaneuraOu
+} 
+} 
 
-#endif  // defined(EVAL_NNUE)
+#endif  
 
-#endif // NNUE_LAYERS_CLIPPED_RELU_H_INCLUDED
+#endif 

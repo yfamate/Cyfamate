@@ -1,4 +1,3 @@
-﻿// NNUE評価関数の入力特徴量PE9の定義
 
 #include "../../../config.h"
 
@@ -46,12 +45,10 @@ inline bool IsDirty(const Eval::DirtyPiece& dp, PieceNumber pn) {
   return false;
 }
 
-// BonaPieceと利き数から特徴量のインデックスを求める
 IndexType PE9::MakeIndex(BonaPiece p, int effect1, int effect2) {
   return p + (static_cast<IndexType>(fe_end) * (effect1 * 3 + effect2));
 }
 
-// 駒の情報を取得する
 inline void PE9::GetPieces(
     const Position& pos, Color perspective,
     BonaPiece** pieces) {
@@ -60,10 +57,8 @@ inline void PE9::GetPieces(
       pos.eval_list()->piece_list_fw();
 }
 
-// 特徴量のうち、値が1であるインデックスのリストを取得する
 void PE9::AppendActiveIndices(
     const Position& pos, Color perspective, IndexList* active) {
-  // コンパイラの警告を回避するため、配列サイズが小さい場合は何もしない
   if (RawFeatures::kMaxActiveDimensions < kMaxActiveDimensions) return;
 
   BonaPiece* pieces;
@@ -81,7 +76,6 @@ void PE9::AppendActiveIndices(
   }
 }
 
-// 特徴量のうち、一手前から値が変化したインデックスのリストを取得する
 void PE9::AppendChangedIndices(
     const Position& pos, Color perspective,
     IndexList* removed, IndexList* added) {
@@ -128,7 +122,7 @@ void PE9::AppendChangedIndices(
   }
 }
 
-} // namespace Eval::NNUE::Features
-} // namespace YaneuraOu
+} 
+} 
 
-#endif  // defined(EVAL_NNUE)
+#endif  

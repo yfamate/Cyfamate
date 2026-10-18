@@ -25,7 +25,7 @@ PRELUDE = """#if !defined(CYFAMATE_TESTING)
 #define SFNNwoPSQT
 #define NNUE_SFNN_HIDDEN1_7
 #define FOR_TOURNAMENT
-#define NNUE_ARCHITECTURE_HEADER "architectures/cyfamate_gp8.h"
+#define NNUE_ARCHITECTURE_HEADER "architectures/SFNN_halfka2_1024_7_64_k3k3.h"
 #define TARGET_CPU "AVX512VNNI"
 #define USE_AVX512
 #define USE_VNNI
@@ -51,9 +51,9 @@ def rel(p):
 
 def expand(path, stack, in_cond):
     txt = open(path, encoding='utf-8-sig', errors='replace').read().replace('\r\n', '\n')
-    if rel(path) == 'eval/nnue/nnue_architecture.h':   # アーキ選択を固定 (SFNN_halfka2_1024_7_64_k3k3)
+    if rel(path) == 'eval/nnue/nnue_architecture.h':
         txt = re.sub(r'^\s*#\s*include\s+"architectures/[^"]+"\s*$', '', txt, flags=re.M)
-        txt = txt.replace('#include NNUE_ARCHITECTURE_HEADER', chr(10).join(['#if defined(CYF_ARCH_K3K3)', '#include "architectures/SFNN_halfka2_1024_7_64_k3k3.h"', '#else', '#include "architectures/cyfamate_gp8.h"', '#endif']))
+        txt = txt.replace('#include NNUE_ARCHITECTURE_HEADER', '#include "architectures/SFNN_halfka2_1024_7_64_k3k3.h"')
     lines = txt.split('\n')
     guard = 0
     for i, l in enumerate(lines):
@@ -93,7 +93,7 @@ def expand(path, stack, in_cond):
         cur.pop()
         out.append(('END', k, parent))
 
-out.append(open(os.path.join(ROOT, 'cyfamate', 'prelude.inc'), encoding='utf-8').read().rstrip(chr(10)))  # Cyfamate: prelude kept in the tree
+out.append(open(os.path.join(ROOT, 'cyfamate', 'prelude.inc'), encoding='utf-8').read().rstrip(chr(10)))
 for s_ in SOURCES:
     p = os.path.join(ROOT, s_)
     out.append('#undef Options')

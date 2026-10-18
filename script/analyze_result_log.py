@@ -19,27 +19,22 @@ res["draw"] = 0
 
 def analyze_log(file_path):
 
-	#	print "file_path = " + file_path
 
 	with open(file_path, 'r', encoding='utf-8') as fi:
 
 		last_line = ""
 		for line in fi.readlines():
 			if ("draw" in line) or ("win" in line) or ("lose" in line):
-				# "gameover win"の"win"の部分を取り出す
 				result = line.split(' ')[1].strip()
 
 				res[result] += 1
 
 				plist = last_line.split(",");
-				# PARAM1:123,PARAM2:234,...のように並んでいる。
 				for p in plist:
 					q = p.split(":")
-					# 末尾のカンマの可能性がある。
 					if len(q) < 2:
 						continue
 
-					# keyがなければ作る。
 					if not q[0] in params:
 						params[q[0]] = {}
 					if not q[1] in params[q[0]]:
@@ -67,7 +62,6 @@ def rating(win,lose,draw):
 	return str(win) + " - " + str(draw) + " - " + str(lose) + "(" + str(round(win_rate*100,2)) + "%" + rating + ")"
 
 def main():
-	#	print os.path.join(sys.argv[1], '*', 'log')
 	for file_path in sorted(glob.glob(os.path.join(sys.argv[1], '*.log'))):
 		fig = analyze_log(file_path)
 		sys.stdout.write(".")

@@ -1,10 +1,9 @@
-﻿#include "nn_tensorrt.h"
+#include "nn_tensorrt.h"
 
 #if defined(YANEURAOU_ENGINE_DEEP) && defined (TENSOR_RT)
 
 #include <regex>
 #include "unpack.cuh"
-//#include "dlshogi_types.h"
 
 using namespace std;
 
@@ -46,16 +45,7 @@ namespace {
 	}
 }
 
-//inline void checkCUDNN(cudnnStatus_t status) {
-//	if (status != CUDNN_STATUS_SUCCESS) {
-//		std::stringstream _error;
-//		_error << "CUDNN failure\nError: " << cudnnGetErrorString(status);
-//		FatalError(_error.str());
-//	}
-//}
 
-// CUDA APIの返し値のエラーチェックを行うヘルパ
-// エラーが発生すれば、その旨を出力して終了する。
 void checkCudaErrors(cudaError_t status) {
 	if (status != 0) {
 		sync_cout << "Error! : Cuda failure , Error = " << cudaGetErrorString(status) << sync_endl;
@@ -63,13 +53,6 @@ void checkCudaErrors(cudaError_t status) {
 	}
 }
 
-//inline void checkCublasErrors(cublasStatus_t status) {
-//	if (status != 0) {
-//		std::stringstream _error;
-//		_error << "Cublas failure\nError code " << status;
-//		FatalError(_error.str());
-//	}
-//}
 
 namespace Eval::dlshogi
 {
@@ -91,7 +74,6 @@ namespace Eval::dlshogi
 		release();
 	}
 
-	// モデルファイルの読み込み。
 	Tools::Result NNTensorRT::load(const std::string& model_path, int gpu_id, int max_batch_size)
 	{
 		this->gpu_id = gpu_id;
@@ -104,11 +86,7 @@ namespace Eval::dlshogi
 
 	void NNTensorRT::release()
 	{
-		// 安全のため、GPU IDをスレッドと関連付けてから開放する。
-		// ※　これは本来しなくても良いと思うのだが、ドライバー側の実装次第では
-		//     何か地雷を踏む可能性がなくはないので安全側に倒しておく。
 
-		// メモリを確保した時のCUDAデバイスを設定する。
 		set_device(gpu_id);
 
 		for (auto& slot : slots)
@@ -129,23 +107,17 @@ namespace Eval::dlshogi
 		slots.clear();
 	}
 
-	// 使用可能なデバイス数を取得する。
 	int NNTensorRT::get_device_count() {
 		int device_count = 0;
 		checkCudaErrors(cudaGetDeviceCount(&device_count));
 		return device_count;
 	}
 
-	// 現在のスレッドとGPUを紐付ける。
-	// ※　CUDAの場合、cudaSetDevice()を呼び出す。必ず、そのスレッドの探索開始時(forward()まで)に一度はこれを呼び出さないといけない。
 	void NNTensorRT::set_device(int gpu_id)
 	{
-		// 存在しないCUDAデバイスに設定しようとした場合、例えば↓のようなエラーを起こす。
-		// Error! : Cuda failure , Error = invalid device ordinal
 		checkCudaErrors(cudaSetDevice(gpu_id));
 	}
 
-	// 初回のみビルドが必要。
 	void NNTensorRT::build(const std::string& onnx_filename)
 	{
 		auto builder = InferUniquePtr<nvinfer1::IBuilder>(nvinfer1::createInferBuilder(gLogger));
@@ -179,12 +151,10 @@ namespace Eval::dlshogi
 			FatalError("parseFromFile");
 		}
 
-		// 教師局面なくてcalibration_cache用意できないのでコメントアウトしておく。(yane)
 #if 0
 		std::unique_ptr<nvinfer1::IInt8Calibrator> calibrator;
 		if (builder->platformHasFastInt8())
 		{
-			// キャリブレーションキャッシュがある場合のみINT8を使用
 			std::string calibration_cache_filename = std::string(onnx_filename) + ".calibcache";
 			std::ifstream calibcache(calibration_cache_filename);
 			if (calibcache.is_open())
@@ -222,8 +192,7 @@ namespace Eval::dlshogi
 		ASSERT_LV3(network->getNbOutputs() == 2);
 
 #if defined(ENABLE_RYFAMATE_PATCH)
-	// testK FP32 softmax
-	if (true/*b_useFP16*/)
+	if (true)
 	{
 		std::cout << "info string Ryfamate FP32 softmax patch." << std::endl;
 		config->setFlag(nvinfer1::BuilderFlag::kFP16);
@@ -234,29 +203,15 @@ namespace Eval::dlshogi
 			auto precition = layer->getPrecision();
 			std::string layername = layer->getName();
 
-			// debug output
-			// std::cout << "info string layer " << i << " type " << (int)layer->getType();
-			// if (layer->precisionIsSet())
-			// 	 std::cout << " prec_set " << (int)precition;
-			// else
-			// 	 std::cout << " prec_not_set";
-			// std::cout << " name " << layername << std::endl;
 
 			if (!layer->precisionIsSet()
-				// || precition == nvinfer1::DataType::kFLOAT
-				// || precition == nvinfer1::DataType::kHALF
 				)
 			{
 				if (layer->getType() == nvinfer1::LayerType::kSOFTMAX
-					// TODO: できれば汎用的なコードにする
 					|| (layer->getType() == nvinfer1::LayerType::kMATRIX_MULTIPLY && layername.find("blocks") != std::string::npos &&
 						layer_before->getType() == nvinfer1::LayerType::kELEMENTWISE)
 				){
-					// softmax層の精度をfp32に設定
 					layer->setPrecision(nvinfer1::DataType::kFLOAT);
-					// for (int j = 0; j < layer->getNbOutputs(); ++j) {
-						// layer->setOutputType(j, nvinfer1::DataType::kFLOAT);
-					// }
 					std::cout << "info string FP32 layer " << i << " type " << (int)layer->getType() << " name " << layername << std::endl;
 				}
 			}
@@ -280,10 +235,6 @@ namespace Eval::dlshogi
 		}
 		config->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, 64_MiB);
 
-		// TensorRT 8 より nvinfer1::IBuilder::buildSerializedNetwork() が追加され、 nvinfer1::IBuilder::buildEngineWithConfig() は非推奨となった。
-		// nvinfer1::IBuilder::buildEngineWithConfig() は TensorRT 10.0 にて削除される見込み。
-		// https://docs.nvidia.com/deeplearning/tensorrt/api/c_api/deprecated.html
-		// https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-800-ea/release-notes/tensorrt-8.html#rel_8-0-0-EA
 #if NV_TENSORRT_MAJOR >= 8
 		auto serializedEngine = InferUniquePtr<nvinfer1::IHostMemory>(builder->buildSerializedNetwork(*network, *config));
 		if (!serializedEngine)
@@ -296,9 +247,6 @@ namespace Eval::dlshogi
 		{
 			FatalError("deserializeCudaEngine");
 		}
-		// 一旦シリアライズ化されたエンジンはデシリアライズを行った上で捨てているが、
-		// この後またすぐにファイル書き出し用にシリアライズを行っているので、手順改善の余地あり。
-		// // auto serializedEngine = InferUniquePtr<nvinfer1::IHostMemory>(engine->serialize());
 #else
 		engine.reset(builder->buildEngineWithConfig(*network, *config));
 		if (!engine)
@@ -310,29 +258,17 @@ namespace Eval::dlshogi
 
 	Tools::Result NNTensorRT::load_model(const string& filename)
 	{
-		// 前に読み込んでいたものがあるなら、それを開放する。
 		infer_engine.reset();
 
-		// シリアライズされたファイルがあるなら、それを代わりに読み込む。
 
-		// デバイス情報の取得
-		//const int  cBufLen = 256;
 		cudaDeviceProp device_prop;
-		//char pciBusId[cBufLen];
 		checkCudaErrors(cudaGetDeviceProperties(&device_prop, gpu_id));
-		//checkCudaErrors(cudaDeviceGetPCIBusId(pciBusId, cBufLen, gpu_id));
 
-		// ファイル名 + "." + (GPU_ID + "." +) DEVICE_NAME + "." + (PCI_BUS_ID + "." +) MAX_BATCH_SIZE + ".TRT" + NV_TENSORRT_VERSION + ".serialized"
-		// GPU_ID は個体に固有・固定ではない。（構成変更時に限らず、リブートしたらIDが変わることもある）
-		// 複数のCUDAデバイスが存在した時、全てのCUDAデバイスが同一とは限らない。
 
-		//sync_cout << "info string gpu_id = " << gpu_id << ", device_name = " << device_prop.name << ", pci_bus_id = " << pciBusId << sync_endl;
 
 		std::string serialized_filename =
 			filename + "." +
-				// std::to_string(gpu_id) + "." +
 				std::regex_replace(std::string(device_prop.name), std::regex("[^A-Za-z0-9._-]"), std::string("_")) + "." +
-				// std::regex_replace(std::string(pciBusId), std::regex("[^A-Za-z0-9._-]"), std::string("_")) + "." +
 				std::to_string(max_batch_size) + "." +
 				"profiles" + std::to_string(profile_count) + "." +
 				"TRT" + std::to_string(getInferLibVersion()) + "." +
@@ -343,8 +279,6 @@ namespace Eval::dlshogi
 
 		sync_cout << "info string serialized filename = " << serialized_filename << sync_endl;
 
-		//std::ifstream seriarizedFile(serialized_filename, std::ios::binary);
-		// →　遅いのでReadFileToMemory()を用いる。これで一発で読み込める。
 
 		std::unique_ptr<u8[]> modelPtr;
 		size_t modelSize = 0;
@@ -357,37 +291,29 @@ namespace Eval::dlshogi
 			auto runtime = InferUniquePtr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(gLogger));
 			infer_engine = InferUniquePtr<nvinfer1::ICudaEngine>(runtime->deserializeCudaEngine(modelPtr.get(), modelSize));
 
-			// ドライバのバージョンが異なるなどが原因で、デシリアライズに失敗することがある。その場合はやりなおす。
 			if (!infer_engine)
 				sync_cout << "info string Warning! TensorRT : Failed to deserialize the model file. filename = " << serialized_filename << sync_endl;
 		}
 
-		// デシリアライズされたファイルがなかったか、デシリアライズに失敗している。
 		if (!infer_engine)
 		{
-			// 初回のみビルドが必要。
-			// シリアライズされたファイルを生成する。
 			sync_cout << "info string TensorRT : build the model file." << sync_endl;
 
 			build(filename);
 
-			// serializing a model
 			auto serializedEngine = InferUniquePtr<nvinfer1::IHostMemory>(infer_engine->serialize());
 			if (!serializedEngine)
 			{
-				//throw std::runtime_error("Engine serialization failed");
 				return Tools::ResultCode::SomeError;
 			}
 			std::ofstream engineFile(serialized_filename, std::ios::binary);
 			if (!engineFile)
 			{
-				//throw std::runtime_error("Cannot open engine file");
 				return Tools::ResultCode::FileOpenError;
 			}
 			engineFile.write(static_cast<char*>(serializedEngine->data()), serializedEngine->size());
 			if (engineFile.fail())
 			{
-				//throw std::runtime_error("Cannot open engine file");
 				return Tools::ResultCode::FileOpenError;
 			}
 		}
@@ -512,8 +438,8 @@ namespace Eval::dlshogi
 		checkCudaErrors(cudaStreamSynchronize(slot->stream));
 	}
 
-} // namespace Eval::dlshogi
-} // namespace YaneuraOu
+} 
+} 
 
-#endif // defined(YANEURAOU_ENGINE_DEEP) && defined (TENSOR_RT)
+#endif 
 
